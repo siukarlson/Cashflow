@@ -3303,52 +3303,8 @@ function showToast(msg){
 // SEED DATA
 // ═══════════════════════════════════════════
 function seed(){
-  if(expenses.length)return;
-  [{date:'2025-01-08',desc:"Sainsbury's",amount:62.40,cat:'groceries',split:true,notes:''},
-   {date:'2025-01-12',desc:'BT Broadband',amount:42.00,cat:'bills',split:false,notes:''},
-   {date:'2025-01-15',desc:'Zara',amount:85.00,cat:'personal',split:false,notes:''},
-   {date:'2025-01-18',desc:"Sainsbury's",amount:55.80,cat:'groceries',split:true,notes:''},
-   {date:'2025-01-22',desc:'EasyJet flights',amount:310.00,cat:'holidays',split:false,notes:'Prague trip'},
-   {date:'2025-02-07',desc:'Tesco',amount:48.20,cat:'groceries',split:true,notes:''},
-   {date:'2025-02-14',desc:'Spotify',amount:11.99,cat:'bills',split:false,notes:''},
-   {date:'2025-02-19',desc:'Airbnb Lisbon',amount:420.00,cat:'holidays',split:false,notes:''},
-   {date:'2025-03-01',desc:'Waitrose',amount:71.30,cat:'groceries',split:true,notes:''},
-   {date:'2025-03-05',desc:'Council Tax',amount:180.00,cat:'bills',split:false,notes:''},
-  ].forEach(e=>expenses.push({id:uid(),...e}));
-
-  if(!cashItems.length){
-    [{name:'HSBC Current',type:'current',region:'uk',currency:'GBP',value:3100,fx:1,notes:''},
-     {name:'HSBC Savings',type:'savings',region:'uk',currency:'GBP',value:8200,fx:1,notes:''},
-     {name:'Vanguard ISA',type:'isa',region:'uk',currency:'GBP',value:18500,fx:1,notes:''},
-     {name:'Bank of NZ Savings',type:'savings',region:'nz',currency:'NZD',value:12000,fx:2.1,notes:''},
-     {name:'HSBC HK Current',type:'current',region:'hk',currency:'HKD',value:25000,fx:9.85,notes:''},
-    ].forEach(c=>cashItems.push({id:uid(),...c}));
-  }
-  if(!shareItems.length){
-    [{name:'Vanguard FTSE All-World',account:'Hargreaves Lansdown',market:'uk',currency:'GBP',units:120,bp:65.20,cp:78.40,fx:1,notes:''},
-     {name:'HSBC Holdings (0005.HK)',account:'HSBC HK',market:'hk',currency:'HKD',units:2000,bp:54.80,cp:61.20,fx:9.85,notes:''},
-     {name:'Apple Inc (AAPL)',account:'Interactive Brokers',market:'us',currency:'USD',units:15,bp:155,cp:198,fx:1.27,notes:''},
-     {name:'Fisher & Paykel',account:'ASB Securities',market:'nz',currency:'NZD',units:500,bp:21.50,cp:24.80,fx:2.1,notes:''},
-    ].forEach(s=>shareItems.push({id:uid(),...s}));
-  }
-  if(!cryptoItems.length){
-    [{name:'Bitcoin (BTC)',account:'Kraken',units:0.12,bp:28000,cp:65000,fx:1.27,notes:''},
-     {name:'Ethereum (ETH)',account:'Kraken',units:0.8,bp:1600,cp:3200,fx:1.27,notes:''},
-    ].forEach(c=>cryptoItems.push({id:uid(),...c}));
-  }
-  if(!pensionItems.length){
-    [{name:'Nest Workplace Pension',region:'uk',currency:'GBP',value:42000,contrib:30000,fx:1,notes:''},
-     {name:'KiwiSaver — ANZ',region:'nz',currency:'NZD',value:22000,contrib:18000,fx:2.1,notes:''},
-    ].forEach(p=>pensionItems.push({id:uid(),...p}));
-  }
-  if(!snaps.length){
-    [{date:'2024-07-01',total:62000,cash:12000,shares:28000,crypto:8000,pension:14000,isa:0,note:'Mid year'},
-     {date:'2024-10-01',total:68000,cash:13000,shares:30000,crypto:10000,pension:15000,isa:0,note:'Q3'},
-     {date:'2025-01-01',total:74000,cash:14000,shares:33000,crypto:12000,pension:15000,isa:0,note:'Year start'},
-     {date:'2025-04-01',total:82000,cash:14500,shares:38000,crypto:14000,pension:15500,isa:0,note:''},
-    ].forEach(s=>snaps.push({id:uid(),...s}));
-  }
-  sv();
+  // Fresh installs (e.g. a new browser, or someone else opening the hosted link)
+  // start genuinely empty — no demo data.
 }
 
 // ═══════════════════════════════════════════
