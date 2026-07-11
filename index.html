@@ -402,6 +402,8 @@ tbody tr:hover td{background:var(--bg3);}
         <button class="btn sm gh" onclick="bulkSetCategory()">Apply category</button>
         <button class="btn sm gh" onclick="bulkSetSplit(true)">÷2 Mark split</button>
         <button class="btn sm gh" onclick="bulkSetSplit(false)">Mark just me</button>
+        <button class="btn sm gh" onclick="bulkSetSettled(true)" title="My share stays half, but excluded from the Shared Expenses balance">✓ Mark settled</button>
+        <button class="btn sm gh" onclick="bulkSetSettled(false)">↩ Mark not settled</button>
         <button class="btn sm dr" onclick="delSelected()">🗑 Delete selected</button>
         <button class="btn sm gh" onclick="clearSelection()">Deselect all</button>
       </div>
@@ -442,6 +444,7 @@ tbody tr:hover td{background:var(--bg3);}
         <div class="tw tw-scroll"><table>
           <thead><tr>
             <th style="width:40px;text-align:center">Split?</th>
+            <th style="width:70px;text-align:center" title="Already settled — Jess paid her half directly, won't be added to Shared Expenses">Settled?</th>
             <th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>My share</th>
             <th style="width:90px" title="Save description→category as a rule for future imports">Save rule</th>
             <th style="width:50px"></th>
@@ -594,6 +597,7 @@ tbody tr:hover td{background:var(--bg3);}
             <button class="btn sm gh" onclick="bulkSetSplitDetailCategory()">Apply category</button>
             <button class="btn sm gh" onclick="bulkSetSplitDetailSplit(true)">÷2 Mark split</button>
             <button class="btn sm gh" onclick="bulkSetSplitDetailSplit(false)">Mark just me</button>
+            <button class="btn sm gh" onclick="bulkSetSplitDetailSettled(true)" title="Jess already paid her half directly — removes from shared tracking">✓ Mark settled</button>
             <input type="number" id="split-bulk-amt" step="0.01" placeholder="Set amount £" class="inp" style="width:120px;padding:5px 8px;font-size:11px">
             <button class="btn sm gh" onclick="bulkSetSplitDetailAmount()">Apply amount</button>
             <button class="btn sm gh" onclick="deselectSplitDetail()">Deselect all</button>
@@ -641,7 +645,10 @@ tbody tr:hover td{background:var(--bg3);}
   </div>
   <div class="fg"><label>Description</label><input type="text" id="e-de" placeholder="e.g. Sainsbury's weekly shop"></div>
   <div class="fg"><label>Category</label><select id="e-c"></select></div>
-  <div class="ck"><input type="checkbox" id="e-sp"><label for="e-sp">Split 50/50 with Jess</label></div>
+  <div class="ck"><input type="checkbox" id="e-sp" onchange="document.getElementById('e-settled-wrap').style.display=this.checked?'flex':'none'"><label for="e-sp">Split 50/50 with Jess</label></div>
+  <div class="ck" id="e-settled-wrap" style="display:none;padding-left:22px">
+    <input type="checkbox" id="e-settled"><label for="e-settled">Already settled — Jess paid her half directly (won't count toward the Shared Expenses balance)</label>
+  </div>
   <div class="fg"><label>Notes (optional)</label><input type="text" id="e-n"></div>
   <div class="ma">
     <button class="btn" onclick="cm('mo-exp')">Cancel</button>
@@ -938,7 +945,10 @@ tbody tr:hover td{background:var(--bg3);}
   <p style="font-size:12px;color:var(--tx2);margin-bottom:14px">When a transaction description <strong>contains</strong> the keyword, it will be assigned to the chosen category automatically.</p>
   <div class="fg"><label>Keyword (part of description)</label><input type="text" id="rl-kw" placeholder="e.g. Sainsbury or NETFLIX"></div>
   <div class="fg"><label>Assign to category</label><select id="rl-cat"></select></div>
-  <div class="ck"><input type="checkbox" id="rl-split"><label for="rl-split">Also auto-tick Split 50/50 with Jess</label></div>
+  <div class="ck"><input type="checkbox" id="rl-split" onchange="document.getElementById('rl-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rl-split">Also auto-tick Split 50/50 with Jess</label></div>
+  <div class="ck" id="rl-settled-wrap" style="display:none;padding-left:22px">
+    <input type="checkbox" id="rl-settled"><label for="rl-settled">Also auto-tick Already settled (Jess pays her half directly)</label>
+  </div>
   <div class="ma">
     <button class="btn" onclick="cm('mo-rule')">Cancel</button>
     <button class="btn pr" onclick="saveRule()">Save rule</button>
@@ -1443,7 +1453,7 @@ function renderExp(){
       <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
       <td style="font-weight:500;white-space:nowrap">${f(e.amount)}</td>
       <td style="white-space:nowrap;color:${e.split?'var(--ac2)':'var(--tx)'};font-weight:500">${f(sh)}</td>
-      <td><span class="bge ${e.split?'sy':'sn'}">${e.split?'÷2 Jess':'Just me'}</span></td>
+      <td>${e.split&&e.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)" title="Jess already paid her half — not tracked in Shared Expenses">✓ Settled</span>`:`<span class="bge ${e.split?'sy':'sn'}">${e.split?'÷2 Jess':'Just me'}</span>`}</td>
       <td style="white-space:nowrap">
         <button class="btn sm gh" onclick="editExp('${e.id}')">Edit</button>
         <button class="btn sm gh dr" onclick="delExp('${e.id}')">✕</button>
@@ -1520,12 +1530,23 @@ function bulkSetSplit(val){
   sv();renderExp();
   showToast(`✓ Marked ${selectedIds.size} expense${selectedIds.size!==1?'s':''} as ${val?'split 50/50':'just me'}`);
 }
+function bulkSetSettled(val){
+  if(!selectedIds.size)return;
+  let count=0;
+  expenses.forEach(e=>{if(selectedIds.has(e.id)&&e.split){e.settled=val;count++;}});
+  if(!count){alert('None of the selected expenses are split 50/50 — only split expenses can be marked settled.');return;}
+  sv();renderExp();
+  if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+  showToast(`✓ Marked ${count} expense${count!==1?'s':''} as ${val?'already settled':'not settled'}`);
+}
 
 function openAddExp(){
   editEid=null;document.getElementById('exp-title').textContent='Add expense';
   document.getElementById('e-d').value=td();
   ['e-a','e-de','e-n'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('e-sp').checked=false;
+  document.getElementById('e-settled').checked=false;
+  document.getElementById('e-settled-wrap').style.display='none';
   pcd();document.getElementById('e-c').value='other';om('mo-exp');
 }
 function editExp(id){
@@ -1536,6 +1557,8 @@ function editExp(id){
   document.getElementById('e-de').value=e.desc;
   document.getElementById('e-n').value=e.notes||'';
   document.getElementById('e-sp').checked=!!e.split;
+  document.getElementById('e-settled').checked=!!e.settled;
+  document.getElementById('e-settled-wrap').style.display=e.split?'flex':'none';
   pcd();document.getElementById('e-c').value=e.cat;om('mo-exp');
 }
 function saveExp(){
@@ -1544,10 +1567,11 @@ function saveExp(){
   const desc=document.getElementById('e-de').value.trim();
   const cat=document.getElementById('e-c').value;
   const split=document.getElementById('e-sp').checked;
+  const settled=split&&document.getElementById('e-settled').checked;
   const notes=document.getElementById('e-n').value.trim();
   if(!date||!amount||!desc){alert('Fill in date, amount and description.');return;}
-  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,desc,cat,split,notes};}
-  else expenses.push({id:uid(),date,amount,desc,cat,split,notes});
+  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,desc,cat,split,settled,notes};}
+  else expenses.push({id:uid(),date,amount,desc,cat,split,settled,notes});
   sv();renderExp();renderEM();cm('mo-exp');
   if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
 }
@@ -1665,7 +1689,32 @@ async function handlePdfFile(file){
   }
   statusEl.style.color='';statusEl.textContent=`Reading ${file.name}…`;
   try{
-    const text=await extractPdfText(file);
+    const rows=await extractPdfRows(file);
+    if(!rows.length){
+      statusEl.style.color='var(--red)';
+      statusEl.textContent=`No text found in ${file.name} — this looks like a scanned/image-only PDF, which isn't supported. Try pasting the transactions manually below.`;
+      return;
+    }
+    // Some current-account statements use separate "Paid out"/"Paid in"/"Balance" columns
+    // rather than one signed amount per line. Detect that layout and use only the paid-out
+    // column so incoming transfers/credits aren't imported as expenses.
+    const colTxns=tryParseColumnStatement(rows);
+    if(colTxns){
+      if(!colTxns.length){
+        statusEl.textContent=`✓ Recognised a "Paid out / Paid in" statement in ${file.name}, but found no paid-out transactions to import.`;
+        return;
+      }
+      const ok=colTxns.map(t=>{
+        const full=acatFull(t.desc);
+        return{date:t.date,desc:t.desc,amount:t.amount,cat:full.cat,split:full.split,settled:full.settled};
+      });
+      ok.forEach(r=>triage.push({id:uid(),...r}));
+      sv();badge();
+      statusEl.textContent=`✓ ${ok.length} paid-out transaction${ok.length!==1?'s':''} imported from ${file.name} (paid-in amounts ignored) — sent to Triage.`;
+      setTimeout(()=>{cm('mo-import');go('triage',Array.from(document.querySelectorAll('.sb-btn')).find(b=>b.textContent.trim().startsWith('Triage')));},1200);
+      return;
+    }
+    const text=rowsToText(rows);
     if(!text.trim()){
       statusEl.style.color='var(--red)';
       statusEl.textContent=`No text found in ${file.name} — this looks like a scanned/image-only PDF, which isn't supported. Try pasting the transactions manually below.`;
@@ -1679,10 +1728,10 @@ async function handlePdfFile(file){
     statusEl.textContent=`Couldn't read PDF: ${err.message}`;
   }
 }
-async function extractPdfText(file){
+async function extractPdfRows(file){
   const buf=await file.arrayBuffer();
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-  const allLines=[];
+  const allRows=[];
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const content=await page.getTextContent();
@@ -1694,12 +1743,72 @@ async function extractPdfText(file){
     });
     const sortedY=[...rows.keys()].sort((a,b)=>b-a);
     sortedY.forEach(y=>{
-      const items=rows.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
-      const line=items.map(i=>i.str).join(' ').replace(/\s+/g,' ').trim();
-      if(line)allLines.push(line);
+      const items=rows.get(y).sort((a,b)=>a.transform[4]-b.transform[4])
+        .map(i=>({str:i.str,x:i.transform[4]}));
+      if(items.length)allRows.push(items);
     });
   }
-  return allLines.join('\n');
+  return allRows;
+}
+function rowsToText(rows){
+  return rows.map(items=>items.map(i=>i.str).join(' ').replace(/\s+/g,' ').trim()).filter(l=>l).join('\n');
+}
+function isAmountToken(s){return /^-?£?[\d,]+\.\d{2}$/.test((s||'').trim());}
+function tryParseColumnStatement(rows){
+  let outX=null,inX=null,balX=null;
+  for(const items of rows){
+    const joined=items.map(i=>i.str).join(' ').toLowerCase();
+    if(joined.includes('paid out')&&joined.includes('paid in')){
+      items.forEach(it=>{
+        const s=it.str.toLowerCase();
+        if(s.includes('out'))outX=it.x;
+        else if(s.includes('balance'))balX=it.x;
+        else if(s.includes('in'))inX=it.x;
+      });
+      break;
+    }
+  }
+  if(outX==null||inX==null)return null; // not this layout — let the caller fall back
+
+  const classify=x=>{
+    const d={out:Math.abs(x-outX),in:Math.abs(x-inX)};
+    if(balX!=null)d.bal=Math.abs(x-balX);
+    let best='out',bestD=d.out;
+    for(const k in d){if(d[k]<bestD){best=k;bestD=d[k];}}
+    return best;
+  };
+
+  const transactions=[];
+  let currentDate=null,descBuffer=[];
+  const dateRe=/^(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/i;
+
+  rows.forEach(items=>{
+    const joined=items.map(i=>i.str).join(' ').trim();
+    if(/paid out/i.test(joined)&&/paid in/i.test(joined))return; // skip the column header row itself
+    const dm=joined.match(dateRe);
+    if(dm){
+      const nd=ndate(dm[1].replace(/\s+/g,' '));
+      if(nd)currentDate=nd;
+    }
+    const numericItems=items.filter(it=>isAmountToken(it.str));
+    let textPart=items.filter(it=>!isAmountToken(it.str)).map(it=>it.str).join(' ').trim();
+    if(dm)textPart=textPart.replace(dateRe,'').trim();
+    if(textPart&&!/^balance (brought|carried) forward$/i.test(textPart))descBuffer.push(textPart);
+
+    let paidOutAmt=null;
+    numericItems.forEach(it=>{
+      if(classify(it.x)==='out'){
+        const v=parseFloat(it.str.replace(/[£,]/g,''));
+        if(v>0)paidOutAmt=v;
+      }
+    });
+    if(paidOutAmt!=null&&currentDate){
+      const desc=descBuffer.join(' ').replace(/\s{2,}/g,' ').trim()||'Unknown';
+      transactions.push({date:currentDate,desc,amount:paidOutAmt});
+      descBuffer=[];
+    }
+  });
+  return transactions;
 }
 function isNoiseLine(line){
   return /statement date|sheet number|card number|account summary|credit limit|standard variable rate|previous balance|new balance|transaction balance|minimum payment|payment to be credited|estimated interest|summary of interest|received by us|your .* statement|mastercard exchange rate|^\d+(\.\d+)?\s*[A-Z]{3}\s*@|exchange rate|detach here|bank giro credit|please (do not|make|enter)|^iban|^bic|sort code|account number|lost and stolen|www\.|tel\s*0|contact tel|allocation of payments|how (to|much)|dispute resolution|interest free period|interest charging|daily interest|recurring transaction|checking your statement|fees? there|default charges|foreign usage|charges cash|instalment plan|no interest charged/i.test(line);
@@ -1765,7 +1874,7 @@ function pline(line){
 
   const cat=acat(desc);
   const full=acatFull(desc);
-  return{date,desc,amount,cat:full.cat,split:full.split};
+  return{date,desc,amount,cat:full.cat,split:full.split,settled:full.settled};
 }
 function ndate(s){
   s=s.trim();
@@ -1781,7 +1890,7 @@ function applyRules(desc){
   // Check user-defined rules first (case-insensitive keyword match)
   for(const r of rules){
     if(desc.toLowerCase().includes(r.keyword.toLowerCase()))
-      return{cat:r.cat, split:r.split};
+      return{cat:r.cat, split:r.split, settled:!!r.settled};
   }
   return null;
 }
@@ -1800,7 +1909,7 @@ function acat(d){
 function acatFull(d){
   const ruled=applyRules(d);
   if(ruled)return ruled;
-  return{cat:acat(d), split:acat(d)==='groceries'};
+  return{cat:acat(d), split:acat(d)==='groceries', settled:false};
 }
 
 // ═══════════════════════════════════════════
@@ -1818,6 +1927,7 @@ function renderTri(){
     const inpStyle='font-size:11px;padding:3px 6px;border:1px solid var(--line2);border-radius:5px;background:var(--bg3);color:var(--tx);font-family:var(--sans)';
     return `<tr id="tr-${t.id}">
       <td style="text-align:center"><input type="checkbox" ${t.split?'checked':''} onchange="tsp('${t.id}',this.checked)" style="accent-color:var(--ac)"></td>
+      <td style="text-align:center"><input type="checkbox" ${t.settled?'checked':''} ${t.split?'':'disabled'} onchange="tset('${t.id}',this.checked)" style="accent-color:var(--pur)" title="Already settled — won't be added to Shared Expenses"></td>
       <td style="white-space:nowrap"><input type="date" value="${t.date}" onchange="tfield('${t.id}','date',this.value)" style="${inpStyle};width:120px"></td>
       <td><input type="text" value="${esc(t.desc)}" onchange="tfield('${t.id}','desc',this.value)" style="${inpStyle};width:100%;min-width:160px"></td>
       <td>
@@ -1867,7 +1977,8 @@ function delAllTriage(){
   triage=[];
   sv();renderTri();badge();
 }
-function tsp(id,v){const t=triage.find(x=>x.id===id);if(t){t.split=v;sv();renderTri();}}
+function tsp(id,v){const t=triage.find(x=>x.id===id);if(t){t.split=v;if(!v)t.settled=false;sv();renderTri();}}
+function tset(id,v){const t=triage.find(x=>x.id===id);if(t&&t.split){t.settled=v;sv();renderTri();}}
 function tcat(id,v){
   const t=triage.find(x=>x.id===id);if(!t)return;
   t.cat=v;sv();
@@ -1901,7 +2012,7 @@ function upsertRule(keyword,cat,split){
 function renderRulesIfVisible(){
   if(document.getElementById('sec-rules').classList.contains('on'))renderRules();
 }
-function triAll(v){triage.forEach(t=>t.split=v);sv();renderTri();}
+function triAll(v){triage.forEach(t=>{t.split=v;if(!v)t.settled=false;});sv();renderTri();}
 function confirmTri(){
   triage.forEach(t=>expenses.push({...t,id:uid()}));
   triage=[];sv();renderTri();renderEM();badge();
@@ -2146,14 +2257,14 @@ function renderEoPie(items){
 // ═══════════════════════════════════════════
 let selectedSplitMonth=null;
 function computeJessBalance(){
-  const splitOwed=expenses.filter(e=>e.split).reduce((s,e)=>s+e.amount/2,0);
+  const splitOwed=expenses.filter(e=>e.split&&!e.settled).reduce((s,e)=>s+e.amount/2,0);
   const iPaidJess=settlements.filter(s=>s.direction==='i_paid_jess').reduce((s,x)=>s+x.amount,0);
   const jessPaidMe=settlements.filter(s=>s.direction==='jess_paid_me').reduce((s,x)=>s+x.amount,0);
   const balance=splitOwed+iPaidJess-jessPaidMe;
   return{splitOwed,iPaidJess,jessPaidMe,balance};
 }
 function renderSplit(){
-  const splitItems=expenses.filter(e=>e.split);
+  const splitItems=expenses.filter(e=>e.split&&!e.settled);
   const totalSplitAmount=splitItems.reduce((s,e)=>s+e.amount,0);
   const now=new Date();
   const thisMonthSplit=splitItems.filter(e=>{const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,e)=>s+e.amount,0);
@@ -2184,7 +2295,7 @@ function renderSplitBalance(){
     </div>`;
 }
 function renderSplitChart(){
-  const months=[...new Set(expenses.filter(e=>e.split).map(e=>e.date.slice(0,7)))].sort();
+  const months=[...new Set(expenses.filter(e=>e.split&&!e.settled).map(e=>e.date.slice(0,7)))].sort();
   const canvas=document.getElementById('split-chart');
   if(cSplit){cSplit.destroy();cSplit=null;}
   if(!months.length){
@@ -2193,7 +2304,7 @@ function renderSplitChart(){
     ctx.fillText('No split expenses yet.',canvas.offsetWidth/2||300,80);
     return;
   }
-  const totals=months.map(m=>expenses.filter(e=>e.split&&e.date.startsWith(m)).reduce((s,e)=>s+e.amount,0));
+  const totals=months.map(m=>expenses.filter(e=>e.split&&!e.settled&&e.date.startsWith(m)).reduce((s,e)=>s+e.amount,0));
   cSplit=new Chart(canvas,{type:'bar',
     data:{labels:months,datasets:[{label:'Total split amount',data:totals,backgroundColor:'rgba(200,240,96,.65)',borderColor:'#c8f060',borderWidth:1,borderRadius:4,minBarLength:4}]},
     options:{responsive:true,maintainAspectRatio:false,
@@ -2208,11 +2319,11 @@ function renderSplitChart(){
   });
 }
 function renderSplitMonthTable(){
-  const months=[...new Set(expenses.filter(e=>e.split).map(e=>e.date.slice(0,7)))].sort().reverse();
+  const months=[...new Set(expenses.filter(e=>e.split&&!e.settled).map(e=>e.date.slice(0,7)))].sort().reverse();
   const tb=document.getElementById('split-month-tb');
   if(!months.length){tb.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:16px">No split expenses yet.</td></tr>`;return;}
   tb.innerHTML=months.map(m=>{
-    const items=expenses.filter(e=>e.split&&e.date.startsWith(m));
+    const items=expenses.filter(e=>e.split&&!e.settled&&e.date.startsWith(m));
     const total=items.reduce((s,e)=>s+e.amount,0);
     return`<tr style="cursor:pointer" onclick="showSplitMonthDetail('${m}')" title="Click to see this month's split expenses">
       <td style="font-weight:500">${m}</td>
@@ -2246,7 +2357,7 @@ function renderSplitMonthDetail(){
     updateSplitSelBar();
     return;
   }
-  const items=expenses.filter(e=>e.split&&e.date.startsWith(selectedSplitMonth)).sort((a,b)=>b.date.localeCompare(a.date));
+  const items=expenses.filter(e=>e.split&&!e.settled&&e.date.startsWith(selectedSplitMonth)).sort((a,b)=>b.date.localeCompare(a.date));
   title.textContent=`Split expenses — ${selectedSplitMonth}`;
   if(!items.length){
     tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--tx2);padding:16px">No split expenses in ${selectedSplitMonth}.</td></tr>`;
@@ -2328,6 +2439,14 @@ function bulkSetSplitDetailSplit(val){
   sv();renderExp();renderEM();renderSplit();
   showToast(`✓ Marked ${count} expense${count!==1?'s':''} as ${val?'split 50/50':'just me'}`);
 }
+function bulkSetSplitDetailSettled(val){
+  if(!splitDetailSelectedIds.size)return;
+  const count=splitDetailSelectedIds.size;
+  expenses.forEach(e=>{if(splitDetailSelectedIds.has(e.id)&&e.split)e.settled=val;});
+  splitDetailSelectedIds.clear(); // settled items drop out of this shared-expenses view
+  sv();renderExp();renderEM();renderSplit();
+  showToast(`✓ Marked ${count} expense${count!==1?'s':''} as settled`);
+}
 function bulkSetSplitDetailAmount(){
   if(!splitDetailSelectedIds.size)return;
   const amt=parseFloat(document.getElementById('split-bulk-amt').value);
@@ -2395,7 +2514,7 @@ function csvEsc(v){
   return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
 }
 function exportSplitExpensesCsv(){
-  const items=[...expenses].filter(e=>e.split).sort((a,b)=>a.date.localeCompare(b.date));
+  const items=[...expenses].filter(e=>e.split&&!e.settled).sort((a,b)=>a.date.localeCompare(b.date));
   if(!items.length){alert('No shared expenses to export yet.');return;}
   const rows=[['Date','Description','Category','Amount','MyShare','Notes'].join(',')];
   items.forEach(e=>{
@@ -3194,7 +3313,7 @@ function renderRules(){
       return `<tr>
         <td style="font-weight:500;font-family:monospace;font-size:12px">${esc(r.keyword)}</td>
         <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
-        <td>${r.split?`<span class="bge sy">÷2 Jess</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
+        <td>${r.split&&r.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)">✓ Settled</span>`:r.split?`<span class="bge sy">÷2 Jess</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
         <td style="white-space:nowrap">
           <button class="btn sm gh" onclick="editRule('${r.id}')">Edit</button>
           <button class="btn sm gh dr" onclick="delRule('${r.id}')">✕</button>
@@ -3208,6 +3327,8 @@ function openAddRule(){
   editRuleId=null;document.getElementById('rule-title').textContent='Add auto-rule';
   document.getElementById('rl-kw').value='';
   document.getElementById('rl-split').checked=false;
+  document.getElementById('rl-settled').checked=false;
+  document.getElementById('rl-settled-wrap').style.display='none';
   pcd();document.getElementById('rl-cat').value='other';
   om('mo-rule');
 }
@@ -3216,6 +3337,8 @@ function editRule(id){
   editRuleId=id;document.getElementById('rule-title').textContent='Edit rule';
   document.getElementById('rl-kw').value=r.keyword;
   document.getElementById('rl-split').checked=!!r.split;
+  document.getElementById('rl-settled').checked=!!r.settled;
+  document.getElementById('rl-settled-wrap').style.display=r.split?'flex':'none';
   pcd();document.getElementById('rl-cat').value=r.cat;
   om('mo-rule');
 }
@@ -3223,14 +3346,15 @@ function saveRule(){
   const keyword=document.getElementById('rl-kw').value.trim();
   const cat=document.getElementById('rl-cat').value;
   const split=document.getElementById('rl-split').checked;
+  const settled=split&&document.getElementById('rl-settled').checked;
   if(!keyword){alert('Enter a keyword.');return;}
   if(editRuleId){
     const i=rules.findIndex(x=>x.id===editRuleId);
-    rules[i]={...rules[i],keyword,cat,split};
+    rules[i]={...rules[i],keyword,cat,split,settled};
   } else {
     const dup=rules.findIndex(r=>r.keyword.toLowerCase()===keyword.toLowerCase());
-    if(dup>=0) rules[dup]={...rules[dup],cat,split};
-    else rules.push({id:uid(),keyword,cat,split});
+    if(dup>=0) rules[dup]={...rules[dup],cat,split,settled};
+    else rules.push({id:uid(),keyword,cat,split,settled});
   }
   sv();renderRules();cm('mo-rule');
   promptApplyRule(keyword,cat,split);
