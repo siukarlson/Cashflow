@@ -182,6 +182,15 @@ tbody tr:hover td{background:var(--bg3);}
 .sw{width:20px;height:20px;border-radius:5px;cursor:pointer;border:2px solid transparent;transition:var(--ease);}
 .sw.on,.sw:hover{border-color:var(--tx);}
 
+/* ── CATEGORY DRAG & DROP ── */
+.cat-row{cursor:grab;}
+.cat-row:active{cursor:grabbing;}
+.cat-row.cat-drop-before{box-shadow:inset 0 2px 0 0 var(--ac);}
+.cat-row.cat-drop-after{box-shadow:inset 0 -2px 0 0 var(--ac);}
+.cat-row.cat-drop-nest{box-shadow:inset 0 0 0 2px var(--ac);background:rgba(200,240,96,.08);}
+.cat-row.child{margin-left:28px;position:relative;}
+.cat-row.child::before{content:'↳';position:absolute;left:-20px;top:50%;transform:translateY(-50%);color:var(--tx3);font-size:12px;}
+
 /* ── PARSE ROW ── */
 .pr-row{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:6px;background:var(--bg3);margin-bottom:4px;font-size:11px;}
 
@@ -220,6 +229,7 @@ tbody tr:hover td{background:var(--bg3);}
 .asset-pill:hover{background:rgba(255,255,255,.08);}
 .m.clickable{cursor:pointer;transition:transform .16s ease,background .16s ease;}
 .m.clickable:hover{background:rgba(255,255,255,.03);transform:translateY(-1px);}
+.m.clickable.on{box-shadow:inset 0 0 0 2px var(--ac);}
 .card.clickable{cursor:pointer;transition:transform .16s ease,background .16s ease;}
 .card.clickable:hover{background:rgba(255,255,255,.03);transform:translateY(-1px);}
 
@@ -272,7 +282,7 @@ tbody tr:hover td{background:var(--bg3);}
     <button class="sb-btn" onclick="go('exp-overview',this)">
       <span class="icon">🧾</span>Expense Overview
     </button>
-    <button class="sb-btn on" onclick="go('expenses',this)">
+    <button class="sb-btn on" id="nav-expenses" onclick="go('expenses',this)">
       <span class="icon">💳</span>Expense Line Item
     </button>
     <button class="sb-btn" onclick="go('triage',this)">
@@ -338,11 +348,11 @@ tbody tr:hover td{background:var(--bg3);}
       <div class="tb" style="margin-bottom:14px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--tx2)">Show data for:</span>
         <div class="tbl" id="eo-period-filter">
-          <button class="btn sm pr" onclick="setEoPeriod('30',this)">Last 30 days</button>
+          <button class="btn sm gh" onclick="setEoPeriod('30',this)">Last 30 days</button>
           <button class="btn sm gh" onclick="setEoPeriod('60',this)">Last 60 days</button>
           <button class="btn sm gh" onclick="setEoPeriod('90',this)">Last 90 days</button>
           <button class="btn sm gh" onclick="setEoPeriod('365',this)">Last year</button>
-          <button class="btn sm gh" onclick="setEoPeriod('all',this)">All time</button>
+          <button class="btn sm pr" onclick="setEoPeriod('all',this)">All time</button>
           <button class="btn sm gh" onclick="setEoPeriod('custom',this)">Custom range</button>
         </div>
         <select class="sel" id="eo-month-sel" onchange="setEoMonth(this.value)"><option value="">Pick a month…</option></select>
@@ -385,6 +395,7 @@ tbody tr:hover td{background:var(--bg3);}
       <div class="tb">
         <div class="tbl">
           <button class="btn pr" onclick="openAddExp()">+ Add expense</button>
+          <button class="btn" onclick="openAddRecurring()">🔁 Add recurring expense</button>
           <select class="sel" id="fmon" onchange="renderExp()"><option value="">All months</option></select>
           <input type="text" class="inp" id="exp-search" placeholder="🔍 Search description…" oninput="renderExp()" style="min-width:200px">
         </div>
@@ -469,6 +480,11 @@ tbody tr:hover td{background:var(--bg3);}
         </div>
       </div>
       <div class="metrics" id="ao-metrics"></div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><h3>Asset allocation</h3></div>
+        <div class="cb"><div class="cw" style="height:220px"><canvas id="ao-pie-chart"></canvas></div>
+        <div class="leg" id="ao-pie-leg"></div></div>
+      </div>
       <div class="tb" style="margin-bottom:14px">
         <span style="font-size:12px;color:var(--tx2)">Lock in today's values as a monthly snapshot for the growth chart.</span>
         <button class="btn pr" onclick="openMonthLock()">📌 Update values & lock month</button>
@@ -640,8 +656,20 @@ tbody tr:hover td{background:var(--bg3);}
 <div class="mod">
   <h3 id="exp-title">Add expense</h3>
   <div class="fr">
-    <div class="fg"><label>Transaction date</label><input type="date" id="e-d"></div>
-    <div class="fg"><label>Amount (£)</label><input type="number" id="e-a" step="0.01" placeholder="0.00"></div>
+    <div class="fg"><label>Transaction date</label><input type="date" id="e-d" style="cursor:pointer" onclick="this.showPicker&&this.showPicker()"></div>
+    <div class="fg"><label>Amount</label><input type="number" id="e-a" step="0.01" placeholder="0.00"></div>
+  </div>
+  <div class="fr">
+    <div class="fg"><label>Currency</label><select id="e-cur" onchange="autoFillFx('e-cur','e-fx')">
+      <option value="GBP">GBP £</option>
+      <option value="HKD">HKD</option>
+      <option value="NZD">NZD</option>
+      <option value="USD">USD</option>
+      <option value="AUD">AUD</option>
+      <option value="EUR">EUR</option>
+    </select></div>
+    <div class="fg"><label>GBP exchange rate</label><input type="number" id="e-fx" step="0.0001" value="1" placeholder="1.0">
+      <div class="hint" id="e-fx-hint">GBP = amount ÷ rate</div></div>
   </div>
   <div class="fg"><label>Description</label><input type="text" id="e-de" placeholder="e.g. Sainsbury's weekly shop"></div>
   <div class="fg"><label>Category</label><select id="e-c"></select></div>
@@ -653,6 +681,42 @@ tbody tr:hover td{background:var(--bg3);}
   <div class="ma">
     <button class="btn" onclick="cm('mo-exp')">Cancel</button>
     <button class="btn pr" onclick="saveExp()">Save</button>
+  </div>
+</div></div>
+
+<!-- ADD RECURRING EXPENSE -->
+<div class="ov" id="mo-recurring">
+<div class="mod">
+  <h3>Add recurring expense</h3>
+  <div class="fr">
+    <div class="fg"><label>Transaction date</label><input type="date" id="rc-d" style="cursor:pointer" onclick="this.showPicker&&this.showPicker()"></div>
+    <div class="fg"><label>Recurring item</label><select id="rc-rule" onchange="fillRecurringFromRule()"></select></div>
+  </div>
+  <div class="fr">
+    <div class="fg"><label>Amount (£)</label><input type="number" id="rc-a" step="0.01" placeholder="0.00"></div>
+    <div class="fg"><label>Category</label><select id="rc-c"></select></div>
+  </div>
+  <div class="fg"><label>Description</label><input type="text" id="rc-de"></div>
+  <div class="ck"><input type="checkbox" id="rc-sp" onchange="document.getElementById('rc-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rc-sp">Split 50/50 with Jess</label></div>
+  <div class="ck" id="rc-settled-wrap" style="display:none;padding-left:22px">
+    <input type="checkbox" id="rc-settled"><label for="rc-settled">Already settled — Jess paid her half directly (won't count toward the Shared Expenses balance)</label>
+  </div>
+  <div class="fg"><label>Notes (optional)</label><input type="text" id="rc-n"></div>
+  <div class="ma">
+    <button class="btn" onclick="cm('mo-recurring')">Cancel</button>
+    <button class="btn pr" onclick="saveRecurringExp()">Add expense</button>
+  </div>
+</div></div>
+
+<!-- AUTO-ADDED RECURRING EXPENSES -->
+<div class="ov" id="mo-auto-added">
+<div class="mod" style="width:min(680px,94vw)">
+  <h3>🔁 Recurring expenses added</h3>
+  <p style="font-size:12px;color:var(--tx2);margin-bottom:14px">These were automatically added based on your recurring auto-rules. Tick any you'd like to remove, then click "Delete selected" — otherwise just close this to keep them all.</p>
+  <div id="auto-added-body" style="max-height:50vh;overflow-y:auto"></div>
+  <div class="ma">
+    <button class="btn" onclick="cm('mo-auto-added')">OK, keep all</button>
+    <button class="btn dr" onclick="deleteSelectedAutoAdded()">🗑 Delete selected</button>
   </div>
 </div></div>
 
@@ -926,15 +990,15 @@ tbody tr:hover td{background:var(--bg3);}
   </div>
 </div></div>
 
-<!-- ADD CATEGORY -->
+<!-- ADD/EDIT CATEGORY -->
 <div class="ov" id="mo-cat">
 <div class="mod">
-  <h3>New category</h3>
+  <h3 id="cat-title">New category</h3>
   <div class="fg"><label>Name</label><input type="text" id="c-nm" placeholder="e.g. Subscriptions"></div>
   <div class="fg"><label>Colour</label><div class="swp" id="swp"></div></div>
   <div class="ma">
     <button class="btn" onclick="cm('mo-cat')">Cancel</button>
-    <button class="btn pr" onclick="saveCat()">Add</button>
+    <button class="btn pr" id="cat-save-btn" onclick="saveCat()">Add</button>
   </div>
 </div></div>
 
@@ -948,6 +1012,39 @@ tbody tr:hover td{background:var(--bg3);}
   <div class="ck"><input type="checkbox" id="rl-split" onchange="document.getElementById('rl-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rl-split">Also auto-tick Split 50/50 with Jess</label></div>
   <div class="ck" id="rl-settled-wrap" style="display:none;padding-left:22px">
     <input type="checkbox" id="rl-settled"><label for="rl-settled">Also auto-tick Already settled (Jess pays her half directly)</label>
+  </div>
+  <div class="dvd"></div>
+  <div class="ck"><input type="checkbox" id="rl-recurring" onchange="document.getElementById('rl-amount-wrap').style.display=this.checked?'block':'none'"><label for="rl-recurring">This is a recurring expense (e.g. a subscription or regular bill)</label></div>
+  <div id="rl-amount-wrap" style="display:none">
+    <div class="fr">
+      <div class="fg"><label>Usual amount</label><input type="number" id="rl-amount" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label>Currency</label><select id="rl-cur" onchange="autoFillFx('rl-cur','rl-fx')">
+        <option value="GBP">GBP £</option>
+        <option value="HKD">HKD</option>
+        <option value="NZD">NZD</option>
+        <option value="USD">USD</option>
+        <option value="AUD">AUD</option>
+        <option value="EUR">EUR</option>
+      </select></div>
+    </div>
+    <div class="fg"><label>GBP exchange rate</label><input type="number" id="rl-fx" step="0.0001" value="1" placeholder="1.0">
+      <div class="hint" id="rl-fx-hint">GBP = amount ÷ rate</div></div>
+    <div class="hint">Auto-fills the amount (converted to GBP) when you add this via "Add recurring expense" — still editable there.</div>
+    <div class="dvd"></div>
+    <div class="ck"><input type="checkbox" id="rl-autoadd" onchange="document.getElementById('rl-autoadd-wrap').style.display=this.checked?'block':'none'"><label for="rl-autoadd">Automatically add this expense on a schedule</label></div>
+    <div id="rl-autoadd-wrap" style="display:none">
+      <div class="fr">
+        <div class="fg"><label>Frequency</label><select id="rl-freq">
+          <option value="weekly">Weekly</option>
+          <option value="fortnightly">Fortnightly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="yearly">Yearly</option>
+        </select></div>
+        <div class="fg"><label>Start date</label><input type="date" id="rl-startdate" style="cursor:pointer" onclick="this.showPicker&&this.showPicker()"></div>
+      </div>
+      <div class="hint">First occurrence. Every time you open the tracker, it will add this expense for every due interval from this date up to today (catching up on any missed ones).</div>
+    </div>
   </div>
   <div class="ma">
     <button class="btn" onclick="cm('mo-rule')">Cancel</button>
@@ -1057,9 +1154,9 @@ let editEid=null, editCashId=null, editShareId=null, editCryptoId=null, editPenI
 let selCol='#7dd87a';
 const SW=['#7dd87a','#60a8f0','#f0b060','#a080f0','#f08060','#60d8c0','#f06080','#c8f060','#f0d060','#f080b0','#8a8794','#60d0f0'];
 
-let cNw=null,cSplit=null,cEoMonthly=null,cEoPie=null;
+let cNw=null,cSplit=null,cEoMonthly=null,cEoPie=null,cAoPie=null;
 let eoActiveCats=new Set();
-let eoPeriod='30';
+let eoPeriod='all';
 let eoSelectedMonth=null;
 const assetCharts={cash:null,shares:null,crypto:null,pension:null};
 const overviewCharts={cash:null,isa:null,shares:null,crypto:null,pension:null};
@@ -1221,9 +1318,19 @@ function renderAssetFilterPills(){
   }).join('');
 }
 
-function toggleAssetSelection(id){
-  if(selectedAssets.has(id))selectedAssets.delete(id);
-  else selectedAssets.add(id);
+function toggleAssetSelection(id,event){
+  const multi=event&&(event.ctrlKey||event.metaKey);
+  if(multi){
+    if(selectedAssets.has(id))selectedAssets.delete(id);
+    else selectedAssets.add(id);
+  }else{
+    if(selectedAssets.size===1&&selectedAssets.has(id)){
+      selectedAssets.clear();
+    }else{
+      selectedAssets.clear();
+      selectedAssets.add(id);
+    }
+  }
   renderAOverview();
 }
 
@@ -1330,7 +1437,7 @@ let activeCats=new Set(); // empty = all
 
 function pcd(){
   const o=cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  ['e-c','rl-cat'].forEach(id=>{
+  ['e-c','rl-cat','rc-c'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const v=el.value;el.innerHTML=o;el.value=v;
   });
@@ -1361,29 +1468,143 @@ function toggleCatPill(id){
 }
 
 function clearCatFilter(){activeCats.clear();buildCatPills();renderExp();}
-function renderCats(){
-  document.getElementById('catlist').innerHTML=cats.map(c=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r2);margin-bottom:7px;">
+function catRowHtml(c,isChild){
+  return`
+    <div class="cat-row${isChild?' child':''}" data-cat-id="${c.id}" draggable="true"
+      ondragstart="catDragStart(event,'${c.id}')" ondragover="catDragOver(event,'${c.id}')"
+      ondragleave="catDragLeave(event)" ondrop="catDrop(event,'${c.id}')" ondragend="catDragEnd(event)"
+      style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r2);margin-bottom:7px;">
       <div style="width:10px;height:10px;border-radius:2px;background:${c.color};flex-shrink:0"></div>
       <span style="flex:1;font-weight:500">${esc(c.name)}</span>
       <span style="font-size:11px;color:var(--tx3)">${expenses.filter(e=>e.cat===c.id).length} txns</span>
+      ${isChild?`<button class="btn sm gh" onclick="ungroupCat('${c.id}')" title="Move back to top level">Ungroup</button>`:''}
+      <button class="btn sm gh" onclick="openEditCat('${c.id}')">Edit</button>
       ${c.id!=='other'?`<button class="btn sm gh dr" onclick="delCat('${c.id}')">Remove</button>`:''}
-    </div>`).join('');
+    </div>`;
 }
+function renderCats(){
+  const top=cats.filter(c=>!c.parentId).sort((a,b)=>(a.order??0)-(b.order??0));
+  const rows=[];
+  top.forEach(c=>{
+    rows.push(catRowHtml(c,false));
+    cats.filter(ch=>ch.parentId===c.id).sort((a,b)=>(a.order??0)-(b.order??0))
+      .forEach(ch=>rows.push(catRowHtml(ch,true)));
+  });
+  document.getElementById('catlist').innerHTML=rows.join('')+
+    `<div style="font-size:11px;color:var(--tx3);margin-top:4px">Drag a category onto another to make it a subcategory (matching its colour). Drag to the top/bottom edge of a row to reorder.</div>`;
+}
+let catDragId=null;
+function catDragStart(e,id){
+  catDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',id);
+}
+function catDragOver(e,id){
+  if(!catDragId||catDragId===id)return;
+  e.preventDefault();
+  const row=e.currentTarget;
+  const rect=row.getBoundingClientRect();
+  const ratio=(e.clientY-rect.top)/rect.height;
+  row.classList.remove('cat-drop-before','cat-drop-after','cat-drop-nest');
+  const target=cats.find(c=>c.id===id);
+  if(ratio<0.25){
+    row.classList.add('cat-drop-before');
+  }else if(ratio>0.75){
+    row.classList.add('cat-drop-after');
+  }else if(!target.parentId){
+    row.classList.add('cat-drop-nest');
+  }else{
+    row.classList.add('cat-drop-after');
+  }
+}
+function catDragLeave(e){
+  e.currentTarget.classList.remove('cat-drop-before','cat-drop-after','cat-drop-nest');
+}
+function catDragEnd(){
+  document.querySelectorAll('#catlist .cat-row').forEach(el=>el.classList.remove('cat-drop-before','cat-drop-after','cat-drop-nest'));
+  catDragId=null;
+}
+function catDrop(e,targetId){
+  e.preventDefault();
+  const row=e.currentTarget;
+  const zoneNest=row.classList.contains('cat-drop-nest');
+  const zoneBefore=row.classList.contains('cat-drop-before');
+  row.classList.remove('cat-drop-before','cat-drop-after','cat-drop-nest');
+  const dragId=catDragId;catDragId=null;
+  if(!dragId||dragId===targetId)return;
+  const dragged=cats.find(c=>c.id===dragId);
+  const target=cats.find(c=>c.id===targetId);
+  if(!dragged||!target)return;
+  if(zoneNest){
+    if(cats.some(c=>c.parentId===dragId)){
+      alert('This category already has subcategories of its own — ungroup them first before nesting it under another category.');
+      return;
+    }
+    if(target.parentId){
+      alert("Can't nest under a subcategory — only top-level categories can have subcategories.");
+      return;
+    }
+    dragged.parentId=target.id;
+    dragged.color=target.color;
+    const siblingOrders=cats.filter(c=>c.parentId===target.id).map(c=>c.order??0);
+    dragged.order=(siblingOrders.length?Math.max(...siblingOrders):0)+1;
+  }else{
+    dragged.parentId=target.parentId||null;
+    // loose equality: older cats may have parentId left as undefined rather than null
+    const siblings=cats.filter(c=>c.parentId==dragged.parentId&&c.id!==dragId)
+      .sort((a,b)=>(a.order??0)-(b.order??0));
+    const idx=siblings.findIndex(c=>c.id===targetId);
+    const insertAt=zoneBefore?idx:idx+1;
+    siblings.splice(insertAt,0,dragged);
+    siblings.forEach((c,i)=>{c.order=i;});
+  }
+  sv();renderCats();pcd();
+}
+function ungroupCat(id){
+  const c=cats.find(x=>x.id===id);if(!c)return;
+  c.parentId=null;
+  const topOrders=cats.filter(x=>!x.parentId).map(x=>x.order??0);
+  c.order=(topOrders.length?Math.max(...topOrders):0)+1;
+  sv();renderCats();pcd();
+}
+let editCatId=null;
 function openAddCat(){
+  editCatId=null;
+  document.getElementById('cat-title').textContent='New category';
+  document.getElementById('cat-save-btn').textContent='Add';
   selCol=SW[0];document.getElementById('c-nm').value='';
   document.getElementById('swp').innerHTML=SW.map(c=>`<div class="sw${c===selCol?' on':''}" style="background:${c}" onclick="pickSw('${c}',this)"></div>`).join('');
+  om('mo-cat');
+}
+function openEditCat(id){
+  const c=cats.find(x=>x.id===id);if(!c)return;
+  editCatId=id;
+  document.getElementById('cat-title').textContent='Edit category';
+  document.getElementById('cat-save-btn').textContent='Save';
+  selCol=SW.includes(c.color)?c.color:SW[0];
+  document.getElementById('c-nm').value=c.name;
+  document.getElementById('swp').innerHTML=SW.map(sc=>`<div class="sw${sc===selCol?' on':''}" style="background:${sc}" onclick="pickSw('${sc}',this)"></div>`).join('');
   om('mo-cat');
 }
 function pickSw(c,el){selCol=c;document.querySelectorAll('.sw').forEach(s=>s.classList.remove('on'));el.classList.add('on');}
 function saveCat(){
   const nm=document.getElementById('c-nm').value.trim();if(!nm)return;
-  cats.push({id:nm.toLowerCase().replace(/\s+/g,'-')+'_'+Date.now(),name:nm,color:selCol});
+  if(editCatId){
+    const c=cats.find(x=>x.id===editCatId);
+    if(c){
+      c.name=nm;c.color=selCol;
+      cats.forEach(ch=>{if(ch.parentId===editCatId)ch.color=selCol;});
+    }
+  }else{
+    const topOrders=cats.filter(c=>!c.parentId).map(c=>c.order??0);
+    cats.push({id:nm.toLowerCase().replace(/\s+/g,'-')+'_'+Date.now(),name:nm,color:selCol,parentId:null,order:(topOrders.length?Math.max(...topOrders):0)+1});
+  }
   sv();renderCats();pcd();cm('mo-cat');
 }
 function delCat(id){
   if(!confirm('Remove? Transactions move to Other.'))return;
   cats=cats.filter(c=>c.id!==id);
+  cats.forEach(c=>{if(c.parentId===id)c.parentId=null;});
   expenses.forEach(e=>{if(e.cat===id)e.cat='other';});
   sv();renderCats();renderExp();pcd();
 }
@@ -1547,13 +1768,26 @@ function openAddExp(){
   document.getElementById('e-sp').checked=false;
   document.getElementById('e-settled').checked=false;
   document.getElementById('e-settled-wrap').style.display='none';
+  document.getElementById('e-cur').value='GBP';
+  document.getElementById('e-fx').value='1';
+  document.getElementById('e-fx-hint').innerHTML='GBP = amount ÷ rate';
   pcd();document.getElementById('e-c').value='other';om('mo-exp');
 }
 function editExp(id){
   const e=expenses.find(x=>x.id===id);if(!e)return;
   editEid=id;document.getElementById('exp-title').textContent='Edit expense';
   document.getElementById('e-d').value=e.date;
-  document.getElementById('e-a').value=e.amount;
+  const cur=e.currency||'GBP';
+  document.getElementById('e-cur').value=cur;
+  if(cur==='GBP'){
+    document.getElementById('e-a').value=e.amount;
+    document.getElementById('e-fx').value='1';
+    document.getElementById('e-fx-hint').innerHTML='GBP base — no conversion needed';
+  }else{
+    document.getElementById('e-a').value=e.origAmt??e.amount;
+    document.getElementById('e-fx').value=e.fx||1;
+    document.getElementById('e-fx-hint').innerHTML=`1 GBP = ${(e.fx||1).toFixed(4)} ${cur}`;
+  }
   document.getElementById('e-de').value=e.desc;
   document.getElementById('e-n').value=e.notes||'';
   document.getElementById('e-sp').checked=!!e.split;
@@ -1563,15 +1797,19 @@ function editExp(id){
 }
 function saveExp(){
   const date=document.getElementById('e-d').value;
-  const amount=parseFloat(document.getElementById('e-a').value);
+  const enteredAmt=parseFloat(document.getElementById('e-a').value);
+  const currency=document.getElementById('e-cur').value;
+  const fx=currency==='GBP'?1:(parseFloat(document.getElementById('e-fx').value)||1);
+  const amount=currency==='GBP'?enteredAmt:enteredAmt/fx;
+  const origAmt=currency==='GBP'?null:enteredAmt;
   const desc=document.getElementById('e-de').value.trim();
   const cat=document.getElementById('e-c').value;
   const split=document.getElementById('e-sp').checked;
   const settled=split&&document.getElementById('e-settled').checked;
   const notes=document.getElementById('e-n').value.trim();
-  if(!date||!amount||!desc){alert('Fill in date, amount and description.');return;}
-  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,desc,cat,split,settled,notes};}
-  else expenses.push({id:uid(),date,amount,desc,cat,split,settled,notes});
+  if(!date||!enteredAmt||!desc){alert('Fill in date, amount and description.');return;}
+  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,currency,fx,origAmt,desc,cat,split,settled,notes};}
+  else expenses.push({id:uid(),date,amount,currency,fx,origAmt,desc,cat,split,settled,notes});
   sv();renderExp();renderEM();cm('mo-exp');
   if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
 }
@@ -1580,6 +1818,48 @@ function delExp(id){
   expenses=expenses.filter(e=>e.id!==id);selectedIds.delete(id);
   sv();renderExp();renderEM();
   if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+}
+
+function openAddRecurring(){
+  const recRules=rules.filter(r=>r.recurring);
+  if(!recRules.length){
+    alert('No recurring items set up yet. Go to Auto-rules → Add rule and tick "This is a recurring expense" first.');
+    return;
+  }
+  const sel=document.getElementById('rc-rule');
+  sel.innerHTML='<option value="">Select a recurring item…</option>'+
+    recRules.map(r=>`<option value="${r.id}">${esc(r.keyword)} — ${f(r.amount||0)}</option>`).join('');
+  document.getElementById('rc-d').value=td();
+  ['rc-a','rc-de','rc-n'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('rc-sp').checked=false;
+  document.getElementById('rc-settled').checked=false;
+  document.getElementById('rc-settled-wrap').style.display='none';
+  pcd();document.getElementById('rc-c').value='other';
+  om('mo-recurring');
+}
+function fillRecurringFromRule(){
+  const r=rules.find(x=>x.id===document.getElementById('rc-rule').value);
+  if(!r)return;
+  document.getElementById('rc-a').value=r.amount??'';
+  document.getElementById('rc-de').value=r.keyword;
+  document.getElementById('rc-c').value=r.cat;
+  document.getElementById('rc-sp').checked=!!r.split;
+  document.getElementById('rc-settled').checked=!!r.settled;
+  document.getElementById('rc-settled-wrap').style.display=r.split?'flex':'none';
+}
+function saveRecurringExp(){
+  const date=document.getElementById('rc-d').value;
+  const amount=parseFloat(document.getElementById('rc-a').value);
+  const desc=document.getElementById('rc-de').value.trim();
+  const cat=document.getElementById('rc-c').value;
+  const split=document.getElementById('rc-sp').checked;
+  const settled=split&&document.getElementById('rc-settled').checked;
+  const notes=document.getElementById('rc-n').value.trim();
+  if(!date||!amount||!desc){alert('Select a date and a recurring item, and confirm the amount.');return;}
+  expenses.push({id:uid(),date,amount,currency:'GBP',fx:1,origAmt:null,desc,cat,split,settled,notes});
+  sv();renderExp();renderEM();cm('mo-recurring');
+  if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+  showToast('✓ Recurring expense added');
 }
 
 // ═══════════════════════════════════════════
@@ -2082,16 +2362,19 @@ function toggleEoCatPill(id,event){
   }
   buildEoCatPills();
   renderEoMonthlyChart(getEoFilteredExpenses());
+  renderEoPie(getEoFilteredExpenses());
 }
 function clearEoCatPills(){
   eoActiveCats.clear();
   buildEoCatPills();
   renderEoMonthlyChart(getEoFilteredExpenses());
+  renderEoPie(getEoFilteredExpenses());
 }
 function selectAllEoCatPills(){
   eoActiveCats=new Set(cats.map(c=>c.id));
   buildEoCatPills();
   renderEoMonthlyChart(getEoFilteredExpenses());
+  renderEoPie(getEoFilteredExpenses());
 }
 function renderEoMonthlyChart(items){
   const ms=[...new Set(items.map(e=>e.date.slice(0,7)))].sort();
@@ -2111,16 +2394,41 @@ function renderEoMonthlyChart(items){
     return;
   }
   if(eoActiveCats.size){
-    const selectedCats=cats.filter(c=>eoActiveCats.has(c.id));
-    const datasets=selectedCats.map(c=>({
-      type:'bar',label:c.name,
-      data:ms.map(m=>items.filter(e=>e.date.startsWith(m)&&e.cat===c.id).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0)),
-      backgroundColor:c.color+'cc',borderColor:c.color,borderWidth:0,borderRadius:2,order:2
-    }));
+    const selectedCats=cats.filter(c=>eoActiveCats.has(c.id)&&!(c.parentId&&eoActiveCats.has(c.parentId)));
+    const datasets=[];
+    selectedCats.forEach(c=>{
+      const children=cats.filter(ch=>ch.parentId===c.id);
+      const selectedChildren=children.filter(ch=>eoActiveCats.has(ch.id));
+      const groupIds=[c.id,...children.map(ch=>ch.id)];
+      const totalData=ms.map(m=>items.filter(e=>e.date.startsWith(m)&&groupIds.includes(e.cat)).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0));
+      if(selectedChildren.length){
+        // selected subcategory(ies) get their own bordered segment within the parent's bar, rather than a separate bar or line
+        const childDatas=selectedChildren.map(ch=>({
+          ch,data:ms.map(m=>items.filter(e=>e.date.startsWith(m)&&e.cat===ch.id).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0))
+        }));
+        childDatas.forEach(({ch,data})=>{
+          datasets.push({
+            type:'bar',label:`${ch.name} (of ${c.name})`,_catIds:[ch.id],
+            data,backgroundColor:c.color+'cc',borderColor:'#000',borderWidth:1,borderRadius:0,order:2
+          });
+        });
+        const remainder=totalData.map((tot,i)=>tot-childDatas.reduce((s,cd)=>s+cd.data[i],0));
+        datasets.push({
+          type:'bar',label:`${c.name} (other)`,_catIds:groupIds,
+          data:remainder,backgroundColor:c.color+'cc',borderColor:'#000',borderWidth:1,borderRadius:2,order:2
+        });
+      }else{
+        datasets.push({
+          type:'bar',label:c.name,_catIds:groupIds,
+          data:totalData,backgroundColor:c.color+'cc',borderColor:'#000',borderWidth:1,borderRadius:2,order:2
+        });
+      }
+    });
     const catTotals=ms.map((_,i)=>datasets.reduce((s,ds)=>s+(ds.data[i]||0),0));
     const catMaxTotal=Math.max(0,...catTotals);
+    const allGroupIds=datasets.flatMap(ds=>ds._catIds);
     datasets.push({
-      type:'line',label:'Total',data:catTotals,
+      type:'line',label:'Total',data:catTotals,_catIds:allGroupIds,
       borderColor:'#60a8f0',backgroundColor:'transparent',borderWidth:2,tension:.4,
       pointBackgroundColor:'#60a8f0',pointRadius:3,pointHoverRadius:5,order:1
     });
@@ -2129,6 +2437,13 @@ function renderEoMonthlyChart(items){
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${c.dataset.label}: ${f(c.raw)}`}}},
         interaction:{mode:'index',intersect:false},
+        onClick:(evt,_els,chart)=>{
+          const pts=chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+          if(!pts.length)return;
+          const{datasetIndex,index}=pts[0];
+          eoDrillToExpenses(ms[index],chart.data.datasets[datasetIndex]._catIds);
+        },
+        onHover:(evt,els)=>{evt.native.target.style.cursor=els.length?'pointer':'default';},
         scales:{
           y:{stacked:true,suggestedMax:catMaxTotal>0?catMaxTotal*1.18:undefined,ticks:{callback:v=>fk(v),color:'#8a8794'},grid:{color:'rgba(255,255,255,.05)'}},
           x:{stacked:true,grid:{display:false},ticks:{color:'#8a8794'}}
@@ -2150,7 +2465,7 @@ function renderEoMonthlyChart(items){
         }
       }]
     });
-    leg.innerHTML=selectedCats.map(c=>`<div class="li"><div class="ld" style="background:${c.color}"></div>${c.name}</div>`).join('')+
+    leg.innerHTML=datasets.filter(ds=>ds.type==='bar').map(ds=>`<div class="li"><div class="ld" style="background:${ds.backgroundColor};border:2px solid ${ds.borderColor}"></div>${ds.label}</div>`).join('')+
       `<div class="li"><div class="ld" style="background:#60a8f0"></div>Total</div>`;
     return;
   }
@@ -2165,6 +2480,12 @@ function renderEoMonthlyChart(items){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${c.dataset.label}: ${f(c.raw)}`}}},
       interaction:{mode:'index',intersect:false},
+      onClick:(evt,_els,chart)=>{
+        const pts=chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+        if(!pts.length)return;
+        eoDrillToExpenses(ms[pts[0].index],null);
+      },
+      onHover:(evt,els)=>{evt.native.target.style.cursor=els.length?'pointer':'default';},
       scales:{
         y:{suggestedMax:maxTotal>0?maxTotal*1.18:undefined,ticks:{callback:v=>fk(v),color:'#8a8794'},grid:{color:'rgba(255,255,255,.05)'}},
         x:{grid:{display:false},ticks:{color:'#8a8794'}}
@@ -2186,6 +2507,16 @@ function renderEoMonthlyChart(items){
       }
     }]
   });
+}
+function eoDrillToExpenses(month,catIds){
+  activeCats.clear();
+  if(catIds)catIds.forEach(id=>activeCats.add(id));
+  const fmonEl=document.getElementById('fmon');
+  if(fmonEl)fmonEl.value=month;
+  const searchEl=document.getElementById('exp-search');
+  if(searchEl)searchEl.value='';
+  buildCatPills();
+  go('expenses',document.getElementById('nav-expenses'));
 }
 function eoPeriodStart(period){
   if(period==='all')return null;
@@ -2225,7 +2556,13 @@ function setEoPeriod(period,btn){
 function renderEoPie(items){
   document.getElementById('eo-pie-title').textContent=`Category breakdown — ${eoPeriodLabel(eoPeriod)}`;
   const bc={};
-  items.forEach(e=>{const s=e.split?e.amount/2:e.amount;bc[e.cat]=(bc[e.cat]||0)+s;});
+  items.forEach(e=>{
+    const cat=gc(e.cat);
+    if(eoActiveCats.size&&!eoActiveCats.has(e.cat)&&!(cat.parentId&&eoActiveCats.has(cat.parentId)))return;
+    const s=e.split?e.amount/2:e.amount;
+    const gid=cat.parentId||e.cat; // roll subcategories up into their parent
+    bc[gid]=(bc[gid]||0)+s;
+  });
   const labs=Object.keys(bc).map(id=>gc(id).name);
   const data=Object.values(bc);
   const cols=Object.keys(bc).map(id=>gc(id).color);
@@ -2586,15 +2923,16 @@ function renderAOverview(){
   document.getElementById('ao-metrics').innerHTML=`
     <div class="metrics">
       <div class="m g"><div class="ml">Total net worth</div><div class="mv" style="${T.total<0?'color:var(--red)':''}">${fks(T.total)}</div><div class="ms">selected assets only</div></div>
-      <div class="m b clickable" onclick="go('a-cash',document.getElementById('nav-a-cash'))"><div class="ml"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${selectedAssets.has('cash')?'checked':''} onclick="event.stopPropagation();toggleAssetSelection('cash')">Cash & savings</label></div><div class="mv" style="${T.cash<0?'color:var(--red)':''}">${fks(T.cash)}</div><div class="ms">excl. ISA</div></div>
-      <div class="m p clickable" onclick="go('a-cash',document.getElementById('nav-a-cash'))"><div class="ml"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${selectedAssets.has('isa')?'checked':''} onclick="event.stopPropagation();toggleAssetSelection('isa')">ISA</label></div><div class="mv" style="${T.isa<0?'color:var(--red)':''}">${fks(T.isa)}</div><div class="ms">tax-free wrapper</div></div>
-      <div class="m g clickable" onclick="go('a-shares',document.getElementById('nav-a-shares'))"><div class="ml"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${selectedAssets.has('shares')?'checked':''} onclick="event.stopPropagation();toggleAssetSelection('shares')">Shares</label></div><div class="mv">${fk(T.shares)}</div><div class="ms">all markets</div></div>
-      <div class="m" style="--mb:var(--tel)" onclick="go('a-crypto',document.getElementById('nav-a-crypto'))"><div class="ml"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${selectedAssets.has('crypto')?'checked':''} onclick="event.stopPropagation();toggleAssetSelection('crypto')">Crypto</label></div><div class="mv">${fk(T.crypto)}</div><div class="ms">all coins</div></div>
-      <div class="m a clickable" onclick="go('a-pension',document.getElementById('nav-a-pension'))"><div class="ml"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" ${selectedAssets.has('pension')?'checked':''} onclick="event.stopPropagation();toggleAssetSelection('pension')">Pension</label></div><div class="mv">${fk(T.pension)}</div><div class="ms">all funds</div></div>
+      <div class="m b clickable${selectedAssets.has('cash')?' on':''}" onclick="toggleAssetSelection('cash',event)"><div class="ml">Cash & savings</div><div class="mv" style="${T.cash<0?'color:var(--red)':''}">${fks(T.cash)}</div><div class="ms">excl. ISA</div></div>
+      <div class="m p clickable${selectedAssets.has('isa')?' on':''}" onclick="toggleAssetSelection('isa',event)"><div class="ml">ISA</div><div class="mv" style="${T.isa<0?'color:var(--red)':''}">${fks(T.isa)}</div><div class="ms">tax-free wrapper</div></div>
+      <div class="m g clickable${selectedAssets.has('shares')?' on':''}" onclick="toggleAssetSelection('shares',event)"><div class="ml">Shares</div><div class="mv">${fk(T.shares)}</div><div class="ms">all markets</div></div>
+      <div class="m clickable${selectedAssets.has('crypto')?' on':''}" style="--mb:var(--tel)" onclick="toggleAssetSelection('crypto',event)"><div class="ml">Crypto</div><div class="mv">${fk(T.crypto)}</div><div class="ms">all coins</div></div>
+      <div class="m a clickable${selectedAssets.has('pension')?' on':''}" onclick="toggleAssetSelection('pension',event)"><div class="ml">Pension</div><div class="mv">${fk(T.pension)}</div><div class="ms">all funds</div></div>
     </div>
-    <div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Use the checkbox on each asset card to include or exclude it from total net worth.</div>`;
+    <div style="font-size:12px;color:var(--tx3);margin-bottom:14px">Click a card to show it alone in Total Net Worth. Ctrl/Cmd+click to add or remove multiple.</div>`;
 
   renderNwCard(T);
+  renderAoPie(T);
 
   // Breakdown cards
   const cashByReg={};
@@ -2691,6 +3029,56 @@ function renderNwCard(T){
         x:{display:true,ticks:{color:'#8a8794'},grid:{display:false}}
       }}
   });
+}
+function renderAoPie(T){
+  const defs=[
+    {id:'cash',label:'Cash & savings',color:'#60a8f0'},
+    {id:'isa',label:'ISA',color:'#a080f0'},
+    {id:'shares',label:'Shares',color:'#7dd87a'},
+    {id:'crypto',label:'Crypto',color:'#f080b0'},
+    {id:'pension',label:'Pension',color:'#f0b060'}
+  ].filter(d=>T[d.id]>0);
+  const labs=defs.map(d=>d.label);
+  const data=defs.map(d=>T[d.id]);
+  const cols=defs.map(d=>d.color);
+  const ttot=data.reduce((a,b)=>a+b,0)||1;
+  const canvas=document.getElementById('ao-pie-chart');
+  if(cAoPie){cAoPie.destroy();cAoPie=null;}
+  if(!data.length){
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='rgba(138,135,148,.35)';ctx.font='12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('No assets to show.',canvas.offsetWidth/2||300,80);
+    document.getElementById('ao-pie-leg').innerHTML='';
+    return;
+  }
+  cAoPie=new Chart(canvas,{type:'doughnut',
+    data:{labels:labs,datasets:[{data,backgroundColor:cols,borderWidth:0,hoverOffset:5}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fks(c.raw)} (${(c.raw/ttot*100).toFixed(1)}%)`}}}},
+    plugins:[{
+      id:'ao-pie-pct-label',
+      afterDatasetsDraw(chart){
+        const{ctx}=chart;
+        const meta=chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font='700 13px DM Sans,sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        meta.data.forEach((arc,i)=>{
+          const pct=data[i]/ttot*100;
+          if(pct<3)return;
+          const{x,y,startAngle,endAngle,innerRadius,outerRadius}=arc.getProps(['x','y','startAngle','endAngle','innerRadius','outerRadius'],true);
+          const mid=(startAngle+endAngle)/2;
+          const r=(innerRadius+outerRadius)/2;
+          const px=x+Math.cos(mid)*r,py=y+Math.sin(mid)*r;
+          const label=`${pct.toFixed(0)}%`;
+          ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.45)';ctx.strokeText(label,px,py);
+          ctx.fillStyle='#fff';ctx.fillText(label,px,py);
+        });
+        ctx.restore();
+      }
+    }]
+  });
+  document.getElementById('ao-pie-leg').innerHTML=labs.map((l,i)=>`<div class="li"><div class="ld" style="background:${cols[i]}"></div>${l} — ${(data[i]/ttot*100).toFixed(1)}%</div>`).join('');
 }
 
 // ── MONTH LOCK ──
@@ -3306,7 +3694,7 @@ function renderRules(){
   const sorted=[...rules].sort((a,b)=>a.keyword.localeCompare(b.keyword));
   el.innerHTML=`<div class="tw"><table>
     <thead><tr>
-      <th>Keyword (contains)</th><th>Assign to category</th><th>Auto-split with Jess</th><th style="width:80px"></th>
+      <th>Keyword (contains)</th><th>Assign to category</th><th>Auto-split with Jess</th><th>Recurring</th><th>Auto-add</th><th style="width:80px"></th>
     </tr></thead>
     <tbody>${sorted.map(r=>{
       const c=gc(r.cat);
@@ -3314,6 +3702,8 @@ function renderRules(){
         <td style="font-weight:500;font-family:monospace;font-size:12px">${esc(r.keyword)}</td>
         <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
         <td>${r.split&&r.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)">✓ Settled</span>`:r.split?`<span class="bge sy">÷2 Jess</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
+        <td>${r.recurring?`<span class="bge" style="background:rgba(200,240,96,.14);color:var(--ac)">🔁 ${f(r.amount||0)}</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
+        <td>${r.autoAdd?`<span class="bge" style="background:rgba(96,168,240,.14);color:#60a8f0" title="Next due: ${nextAutoDate(r)}">${FREQ_LABELS[r.frequency]||'Fortnightly'} from ${r.startDate}</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
         <td style="white-space:nowrap">
           <button class="btn sm gh" onclick="editRule('${r.id}')">Edit</button>
           <button class="btn sm gh dr" onclick="delRule('${r.id}')">✕</button>
@@ -3329,6 +3719,16 @@ function openAddRule(){
   document.getElementById('rl-split').checked=false;
   document.getElementById('rl-settled').checked=false;
   document.getElementById('rl-settled-wrap').style.display='none';
+  document.getElementById('rl-recurring').checked=false;
+  document.getElementById('rl-amount').value='';
+  document.getElementById('rl-amount-wrap').style.display='none';
+  document.getElementById('rl-cur').value='GBP';
+  document.getElementById('rl-fx').value='1';
+  document.getElementById('rl-fx-hint').innerHTML='GBP = amount ÷ rate';
+  document.getElementById('rl-autoadd').checked=false;
+  document.getElementById('rl-autoadd-wrap').style.display='none';
+  document.getElementById('rl-freq').value='fortnightly';
+  document.getElementById('rl-startdate').value=td();
   pcd();document.getElementById('rl-cat').value='other';
   om('mo-rule');
 }
@@ -3339,6 +3739,23 @@ function editRule(id){
   document.getElementById('rl-split').checked=!!r.split;
   document.getElementById('rl-settled').checked=!!r.settled;
   document.getElementById('rl-settled-wrap').style.display=r.split?'flex':'none';
+  document.getElementById('rl-recurring').checked=!!r.recurring;
+  document.getElementById('rl-amount-wrap').style.display=r.recurring?'block':'none';
+  const cur=r.currency||'GBP';
+  document.getElementById('rl-cur').value=cur;
+  if(cur==='GBP'){
+    document.getElementById('rl-amount').value=r.amount??'';
+    document.getElementById('rl-fx').value='1';
+    document.getElementById('rl-fx-hint').innerHTML='GBP base — no conversion needed';
+  }else{
+    document.getElementById('rl-amount').value=r.origAmt??r.amount??'';
+    document.getElementById('rl-fx').value=r.fx||1;
+    document.getElementById('rl-fx-hint').innerHTML=`1 GBP = ${(r.fx||1).toFixed(4)} ${cur}`;
+  }
+  document.getElementById('rl-autoadd').checked=!!r.autoAdd;
+  document.getElementById('rl-autoadd-wrap').style.display=r.autoAdd?'block':'none';
+  document.getElementById('rl-freq').value=r.frequency||'fortnightly';
+  document.getElementById('rl-startdate').value=r.startDate||td();
   pcd();document.getElementById('rl-cat').value=r.cat;
   om('mo-rule');
 }
@@ -3347,22 +3764,129 @@ function saveRule(){
   const cat=document.getElementById('rl-cat').value;
   const split=document.getElementById('rl-split').checked;
   const settled=split&&document.getElementById('rl-settled').checked;
+  const recurring=document.getElementById('rl-recurring').checked;
+  let amount=null,currency='GBP',fx=1,origAmt=null;
+  if(recurring){
+    const enteredAmt=parseFloat(document.getElementById('rl-amount').value);
+    currency=document.getElementById('rl-cur').value;
+    fx=currency==='GBP'?1:(parseFloat(document.getElementById('rl-fx').value)||1);
+    amount=isNaN(enteredAmt)?null:(currency==='GBP'?enteredAmt:enteredAmt/fx);
+    origAmt=currency==='GBP'?null:enteredAmt;
+  }
+  const autoAdd=recurring&&document.getElementById('rl-autoadd').checked;
+  const frequency=autoAdd?document.getElementById('rl-freq').value:null;
+  const startDate=autoAdd?document.getElementById('rl-startdate').value:null;
   if(!keyword){alert('Enter a keyword.');return;}
+  if(autoAdd&&!startDate){alert('Choose a start date for the auto-add schedule.');return;}
+  const prevRule=editRuleId?rules.find(x=>x.id===editRuleId):null;
+  const lastAutoDate=(prevRule&&prevRule.autoAdd&&prevRule.startDate===startDate&&prevRule.frequency===frequency)?prevRule.lastAutoDate:null;
   if(editRuleId){
     const i=rules.findIndex(x=>x.id===editRuleId);
-    rules[i]={...rules[i],keyword,cat,split,settled};
+    rules[i]={...rules[i],keyword,cat,split,settled,recurring,amount,currency,fx,origAmt,autoAdd,frequency,startDate,lastAutoDate};
   } else {
     const dup=rules.findIndex(r=>r.keyword.toLowerCase()===keyword.toLowerCase());
-    if(dup>=0) rules[dup]={...rules[dup],cat,split,settled};
-    else rules.push({id:uid(),keyword,cat,split,settled});
+    if(dup>=0) rules[dup]={...rules[dup],cat,split,settled,recurring,amount,currency,fx,origAmt,autoAdd,frequency,startDate,lastAutoDate};
+    else rules.push({id:uid(),keyword,cat,split,settled,recurring,amount,currency,fx,origAmt,autoAdd,frequency,startDate,lastAutoDate});
   }
   sv();renderRules();cm('mo-rule');
   promptApplyRule(keyword,cat,split);
+  processAutoRecurring();
 }
 function delRule(id){
   if(!confirm('Delete this rule?'))return;
   rules=rules.filter(r=>r.id!==id);
   sv();renderRules();
+}
+
+// ── AUTO-ADD RECURRING EXPENSES ──
+const FREQ_LABELS={weekly:'Weekly',fortnightly:'Fortnightly',monthly:'Monthly',quarterly:'Quarterly',yearly:'Yearly'};
+function addDays(dateStr,days){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+function addMonths(dateStr,months){
+  const d=new Date(dateStr+'T00:00:00');
+  const day=d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth()+months);
+  const lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  d.setDate(Math.min(day,lastDay));
+  return d.toISOString().slice(0,10);
+}
+function advanceDate(dateStr,frequency){
+  if(frequency==='weekly')return addDays(dateStr,7);
+  if(frequency==='monthly')return addMonths(dateStr,1);
+  if(frequency==='quarterly')return addMonths(dateStr,3);
+  if(frequency==='yearly')return addMonths(dateStr,12);
+  return addDays(dateStr,14); // fortnightly / fallback
+}
+function nextAutoDate(r){
+  return r.lastAutoDate?advanceDate(r.lastAutoDate,r.frequency):r.startDate;
+}
+function processAutoRecurring(){
+  const today=td();
+  const addedItems=[];
+  rules.forEach(r=>{
+    if(!r.recurring||!r.autoAdd||!r.startDate)return;
+    let cursor=r.lastAutoDate?advanceDate(r.lastAutoDate,r.frequency):r.startDate;
+    let guard=0;
+    while(cursor<=today&&guard<1000){
+      const exp={
+        id:uid(),date:cursor,amount:r.amount||0,currency:r.currency||'GBP',fx:r.fx||1,origAmt:r.origAmt??null,
+        desc:r.keyword,cat:r.cat,split:!!r.split,settled:!!(r.split&&r.settled),
+        notes:'Auto-added recurring expense'
+      };
+      expenses.push(exp);
+      addedItems.push(exp);
+      r.lastAutoDate=cursor;
+      guard++;
+      cursor=advanceDate(cursor,r.frequency);
+    }
+  });
+  if(addedItems.length){
+    sv();renderExp();renderEM();renderRules();
+    if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+    openAutoAddedModal(addedItems);
+  }
+}
+let autoAddedIds=[];
+function openAutoAddedModal(items){
+  autoAddedIds=items.map(e=>e.id);
+  renderAutoAddedList();
+  om('mo-auto-added');
+}
+function renderAutoAddedList(){
+  const body=document.getElementById('auto-added-body');
+  const items=expenses.filter(e=>autoAddedIds.includes(e.id)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!items.length){
+    body.innerHTML=`<div class="inf">All of these have been removed.</div>`;
+    return;
+  }
+  const total=items.reduce((s,e)=>s+e.amount,0);
+  body.innerHTML=`<div class="inf" style="margin-bottom:10px">${items.length} expense${items.length!==1?'s':''} auto-added, totalling ${f(total)}. Tick any to delete them.</div>`+
+    `<div class="tw"><table><thead><tr>
+      <th style="width:36px"></th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th>
+    </tr></thead><tbody>${items.map(e=>{
+      const c=gc(e.cat);
+      return`<tr>
+        <td style="text-align:center"><input type="checkbox" data-auto-id="${e.id}" style="accent-color:var(--red);width:14px;height:14px;cursor:pointer"></td>
+        <td style="color:var(--tx2);font-size:11px;white-space:nowrap">${e.date}</td>
+        <td>${esc(e.desc)}${e.split?` <span class="bge sy" style="margin-left:4px">÷2 Jess</span>`:''}</td>
+        <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
+        <td style="font-weight:500;white-space:nowrap">${f(e.amount)}</td>
+      </tr>`;}).join('')}</tbody></table></div>`;
+}
+function deleteSelectedAutoAdded(){
+  const ids=[...document.querySelectorAll('#auto-added-body input[data-auto-id]:checked')].map(cb=>cb.getAttribute('data-auto-id'));
+  if(!ids.length){alert('Tick at least one expense to delete.');return;}
+  expenses=expenses.filter(e=>!ids.includes(e.id));
+  autoAddedIds=autoAddedIds.filter(id=>!ids.includes(id));
+  sv();renderExp();renderEM();
+  if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+  showToast(`✓ Removed ${ids.length} auto-added expense${ids.length!==1?'s':''}`);
+  if(autoAddedIds.length)renderAutoAddedList();
+  else cm('mo-auto-added');
 }
 
 // ── APPLY RULE TO EXISTING EXPENSES ──
@@ -3742,7 +4266,7 @@ function importJSON(input){
   reader.readAsText(file);
 }
 
-seed();lastSnapshot=captureState();pcd();renderEM();renderExp();badge();initTheme();
+seed();processAutoRecurring();lastSnapshot=captureState();pcd();renderEM();renderExp();badge();initTheme();
 </script>
 </body>
 </html>
