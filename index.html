@@ -361,16 +361,14 @@ tbody tr:hover td{background:var(--bg3);}
           <button class="btn sm gh" onclick="setEoPeriod('365',this)">Last year</button>
           <button class="btn sm pr" onclick="setEoPeriod('all',this)">All time</button>
           <button class="btn sm gh" onclick="setEoPeriod('custom',this)">Custom range</button>
+          <span id="eo-custom-range" style="display:none;align-items:center;gap:6px">
+            <label style="font-size:11px;color:var(--tx2)">From</label>
+            <input type="date" class="inp" id="eo-from" onchange="renderExpOverview()">
+            <label style="font-size:11px;color:var(--tx2)">To</label>
+            <input type="date" class="inp" id="eo-to" onchange="renderExpOverview()">
+          </span>
         </div>
         <select class="sel" id="eo-month-sel" onchange="setEoMonth(this.value)"><option value="">Pick a month…</option></select>
-      </div>
-      <div class="tb" id="eo-custom-range" style="display:none;margin-bottom:14px">
-        <div class="tbl" style="align-items:center">
-          <label style="font-size:11px;color:var(--tx2)">From</label>
-          <input type="date" class="inp" id="eo-from" onchange="renderExpOverview()">
-          <label style="font-size:11px;color:var(--tx2)">To</label>
-          <input type="date" class="inp" id="eo-to" onchange="renderExpOverview()">
-        </div>
       </div>
       <div id="eo-cat-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;align-items:center;">
         <span style="font-size:11px;color:var(--tx3);flex-shrink:0">Show categories (click = only this one, ctrl+click = add/remove):</span>
@@ -402,7 +400,7 @@ tbody tr:hover td{background:var(--bg3);}
       <div class="tb">
         <div class="tbl">
           <button class="btn pr" onclick="openAddExp()">+ Add expense</button>
-          <button class="btn" onclick="openAddRecurring()">🔁 Add recurring expense</button>
+          <button class="btn pr" onclick="openAddRecurring()">🔁 Add recurring expense</button>
           <select class="sel" id="fmon" onchange="renderExp()"><option value="">All months</option></select>
           <input type="text" class="inp" id="exp-search" placeholder="🔍 Search description…" oninput="renderExp()" style="min-width:200px">
         </div>
@@ -439,7 +437,7 @@ tbody tr:hover td{background:var(--bg3);}
 
     <!-- TRIAGE -->
     <div id="sec-triage" class="sec">
-      <div class="inf">Review pasted transactions. Tick which to split 50/50 with Jess, adjust categories, then confirm.</div>
+      <div class="inf" id="triage-info-text">Review pasted transactions. Tick which to split 50/50 with Jess, adjust categories, then confirm.</div>
       <div class="tb">
         <div class="tbl">
           <button class="btn" onclick="openImport()">📋 Paste bank statement</button>
@@ -462,7 +460,7 @@ tbody tr:hover td{background:var(--bg3);}
         <div class="tw tw-scroll"><table>
           <thead><tr>
             <th style="width:40px;text-align:center">Split?</th>
-            <th style="width:70px;text-align:center" title="Already settled — Jess paid her half directly, won't be added to Shared Expenses">Settled?</th>
+            <th style="width:70px;text-align:center" id="th-triage-settled" title="Already settled — Jess paid her half directly, won't be added to Shared Expenses">Settled?</th>
             <th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>My share</th>
             <th style="width:90px" title="Save description→category as a rule for future imports">Save rule</th>
             <th style="width:50px"></th>
@@ -599,7 +597,7 @@ tbody tr:hover td{background:var(--bg3);}
       <div class="card">
         <div class="ch"><h3>Monthly breakdown</h3></div>
         <div class="tw" style="border:none;border-radius:0"><table>
-          <thead><tr><th>Month</th><th>Take-home salary</th><th>Expenses (my share)</th><th>Left over</th></tr></thead>
+          <thead><tr><th>Month</th><th>Take-home salary</th><th>Expenses (my share)</th><th>Left over</th><th>Left over %</th></tr></thead>
           <tbody id="budget-tb"></tbody>
         </table></div>
       </div>
@@ -628,14 +626,14 @@ tbody tr:hover td{background:var(--bg3);}
     <div id="sec-split" class="sec">
       <div class="metrics" id="split-metrics"></div>
       <div class="tb" style="margin-bottom:14px">
-        <span style="font-size:12px;color:var(--tx2)">Exchange line items with Jess:</span>
+        <span style="font-size:12px;color:var(--tx2)" id="split-exchange-label">Exchange line items with Jess:</span>
         <div class="tbl">
           <button class="btn sm" onclick="exportSplitExpensesCsv()">📤 Export shared expenses (CSV)</button>
-          <button class="btn sm" onclick="openJessImport()">📥 Import from Jess</button>
+          <button class="btn sm" onclick="openJessImport()" id="btn-import-jess">📥 Import from Jess</button>
         </div>
       </div>
       <div class="card" style="margin-bottom:14px">
-        <div class="ch"><h3>Balance with Jess</h3>
+        <div class="ch"><h3 id="h3-balance-jess">Balance with Jess</h3>
           <button class="btn sm pr" onclick="openSettlement()">+ Record a payment</button>
         </div>
         <div class="cb" id="split-balance"></div>
@@ -657,7 +655,7 @@ tbody tr:hover td{background:var(--bg3);}
             <button class="btn sm gh" onclick="bulkSetSplitDetailCategory()">Apply category</button>
             <button class="btn sm gh" onclick="bulkSetSplitDetailSplit(true)">÷2 Mark split</button>
             <button class="btn sm gh" onclick="bulkSetSplitDetailSplit(false)">Mark just me</button>
-            <button class="btn sm gh" onclick="bulkSetSplitDetailSettled(true)" title="Jess already paid her half directly — removes from shared tracking">✓ Mark settled</button>
+            <button class="btn sm gh" onclick="bulkSetSplitDetailSettled(true)" id="btn-mark-settled-detail" title="Jess already paid her half directly — removes from shared tracking">✓ Mark settled</button>
             <input type="number" id="split-bulk-amt" step="0.01" placeholder="Set amount £" class="inp" style="width:120px;padding:5px 8px;font-size:11px">
             <button class="btn sm gh" onclick="bulkSetSplitDetailAmount()">Apply amount</button>
             <button class="btn sm gh" onclick="deselectSplitDetail()">Deselect all</button>
@@ -676,7 +674,7 @@ tbody tr:hover td{background:var(--bg3);}
       <div class="card" style="margin-bottom:14px">
         <div class="ch"><h3>Monthly breakdown</h3></div>
         <div class="tw" style="border:none;border-radius:0"><table>
-          <thead><tr><th>Month</th><th>Split transactions</th><th>Total amount</th><th>My share</th><th>Jess's share</th></tr></thead>
+          <thead><tr><th>Month</th><th>Split transactions</th><th>Total amount</th><th>My share</th><th id="th-jess-share">Jess's share</th></tr></thead>
           <tbody id="split-month-tb"></tbody>
         </table></div>
       </div>
@@ -717,9 +715,16 @@ tbody tr:hover td{background:var(--bg3);}
   </div>
   <div class="fg"><label>Description</label><input type="text" id="e-de" placeholder="e.g. Sainsbury's weekly shop"></div>
   <div class="fg"><label>Category</label><select id="e-c"></select></div>
-  <div class="ck"><input type="checkbox" id="e-sp" onchange="document.getElementById('e-settled-wrap').style.display=this.checked?'flex':'none'"><label for="e-sp">Split 50/50 with Jess</label></div>
+  <div class="ck"><input type="checkbox" id="e-sp" onchange="document.getElementById('e-paidby-wrap').style.display=this.checked?'flex':'none';document.getElementById('e-settled-wrap').style.display=this.checked?'flex':'none'"><label for="e-sp" id="lbl-e-sp">Split 50/50 with Jess</label></div>
+  <div class="ck" id="e-paidby-wrap" style="display:none;padding-left:22px">
+    <label style="font-size:11px;color:var(--tx2)">Who paid?</label>
+    <select id="e-paidby" style="padding:4px 8px;font-size:11px;border:1px solid var(--line2);border-radius:5px;background:var(--bg3);color:var(--tx);font-family:var(--sans)">
+      <option value="me" id="opt-paidby-me">Me (Jess owes me half)</option>
+      <option value="jess" id="opt-paidby-jess">Jess (I owe her half)</option>
+    </select>
+  </div>
   <div class="ck" id="e-settled-wrap" style="display:none;padding-left:22px">
-    <input type="checkbox" id="e-settled"><label for="e-settled">Already settled — Jess paid her half directly (won't count toward the Shared Expenses balance)</label>
+    <input type="checkbox" id="e-settled"><label for="e-settled">Already settled directly between us (won't count toward the Shared Expenses balance)</label>
   </div>
   <div class="fg"><label>Notes (optional)</label><input type="text" id="e-n"></div>
   <div class="ma">
@@ -741,9 +746,9 @@ tbody tr:hover td{background:var(--bg3);}
     <div class="fg"><label>Category</label><select id="rc-c"></select></div>
   </div>
   <div class="fg"><label>Description</label><input type="text" id="rc-de"></div>
-  <div class="ck"><input type="checkbox" id="rc-sp" onchange="document.getElementById('rc-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rc-sp">Split 50/50 with Jess</label></div>
+  <div class="ck"><input type="checkbox" id="rc-sp" onchange="document.getElementById('rc-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rc-sp" id="lbl-rc-sp">Split 50/50 with Jess</label></div>
   <div class="ck" id="rc-settled-wrap" style="display:none;padding-left:22px">
-    <input type="checkbox" id="rc-settled"><label for="rc-settled">Already settled — Jess paid her half directly (won't count toward the Shared Expenses balance)</label>
+    <input type="checkbox" id="rc-settled"><label for="rc-settled" id="lbl-rc-settled">Already settled — Jess paid her half directly (won't count toward the Shared Expenses balance)</label>
   </div>
   <div class="fg"><label>Notes (optional)</label><input type="text" id="rc-n"></div>
   <div class="ma">
@@ -783,6 +788,18 @@ tbody tr:hover td{background:var(--bg3);}
   <div id="undo-body" style="max-height:60vh;overflow-y:auto"></div>
   <div class="ma">
     <button class="btn" onclick="cm('mo-undo')">Close</button>
+  </div>
+</div></div>
+
+<!-- WHO IS THE OTHER PARTY -->
+<div class="ov" id="mo-party-name-first">
+<div class="mod" style="width:min(440px,94vw)">
+  <h3>Who do you share expenses with?</h3>
+  <p style="font-size:12px;color:var(--tx2);margin-bottom:14px">This name is used throughout the Shared Expenses page. You can change it anytime in Settings.</p>
+  <div class="fg"><label>Their name</label><input type="text" id="party-name-first-input" placeholder="e.g. Jess"></div>
+  <div class="ma">
+    <button class="btn" onclick="skipPartyNamePrompt()">Skip for now</button>
+    <button class="btn pr" onclick="savePartyNameFirst()">Save</button>
   </div>
 </div></div>
 
@@ -1002,8 +1019,8 @@ tbody tr:hover td{background:var(--bg3);}
   <h3 id="settle-title">Record a payment</h3>
   <div class="fg"><label>Date</label><input type="date" id="se-d"></div>
   <div class="fg"><label>Direction</label><select id="se-dir">
-    <option value="jess_paid_me">Jess paid me</option>
-    <option value="i_paid_jess">I paid Jess</option>
+    <option value="jess_paid_me" id="opt-settle-jess-paid-me">Jess paid me</option>
+    <option value="i_paid_jess" id="opt-settle-i-paid-jess">I paid Jess</option>
   </select></div>
   <div class="fg"><label>Amount (£)</label><input type="number" id="se-a" step="0.01" placeholder="0.00"></div>
   <div class="fg"><label>Note (optional)</label><input type="text" id="se-n" placeholder="e.g. Bank transfer"></div>
@@ -1016,11 +1033,11 @@ tbody tr:hover td{background:var(--bg3);}
 <!-- IMPORT FROM JESS -->
 <div class="ov" id="mo-jess-import">
 <div class="mod" style="width:min(640px,94vw)">
-  <h3>Import line items from Jess</h3>
-  <div class="inf">
+  <h3 id="h3-jess-import">Import line items from Jess</h3>
+  <div class="inf" id="jess-import-info">
     Paste CSV lines Jess sent you, or use the file picker below. Expected columns:
     <code>Date,Description,Category,Amount,MyShare,Notes</code>
-    The Category and Notes columns are optional — we'll auto-categorise if Category is left blank. Imported items are marked as shared (split 50/50) by default and sent to Triage so you can review, adjust, and confirm before they're added to your expenses.
+    The Category and Notes columns are optional — we'll auto-categorise if Category is left blank. These are things <strong>Jess paid for</strong>, so they're marked "paid by Jess" and shared 50/50 — meaning your half will count toward what you owe her. Items are sent to Triage so you can review, adjust, and confirm before they're added to your expenses.
   </div>
   <div class="fg"><label>CSV file (optional)</label>
     <input type="file" id="jess-file-input" accept=".csv,text/csv" onchange="handleJessCsvFile(this.files[0])">
@@ -1031,6 +1048,17 @@ tbody tr:hover td{background:var(--bg3);}
   <div class="ma">
     <button class="btn" onclick="cm('mo-jess-import')">Cancel</button>
     <button class="btn pr" onclick="doJessImport()">Parse & send to triage →</button>
+  </div>
+</div></div>
+
+<!-- CONFIRM JESS IMPORT -->
+<div class="ov" id="mo-jess-confirm">
+<div class="mod" style="width:min(480px,94vw)">
+  <h3 id="h3-jess-confirm">Confirm import from Jess</h3>
+  <div id="jess-confirm-body" style="font-size:13px;color:var(--tx2);line-height:1.7;margin-bottom:16px"></div>
+  <div class="ma">
+    <button class="btn" onclick="cm('mo-jess-confirm')">Cancel</button>
+    <button class="btn pr" onclick="confirmJessImport()">Confirm & send to triage →</button>
   </div>
 </div></div>
 
@@ -1053,9 +1081,9 @@ tbody tr:hover td{background:var(--bg3);}
   <p style="font-size:12px;color:var(--tx2);margin-bottom:14px">When a transaction description <strong>contains</strong> the keyword, it will be assigned to the chosen category automatically.</p>
   <div class="fg"><label>Keyword (part of description)</label><input type="text" id="rl-kw" placeholder="e.g. Sainsbury or NETFLIX"></div>
   <div class="fg"><label>Assign to category</label><select id="rl-cat"></select></div>
-  <div class="ck"><input type="checkbox" id="rl-split" onchange="document.getElementById('rl-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rl-split">Also auto-tick Split 50/50 with Jess</label></div>
+  <div class="ck"><input type="checkbox" id="rl-split" onchange="document.getElementById('rl-settled-wrap').style.display=this.checked?'flex':'none'"><label for="rl-split" id="lbl-rl-split">Also auto-tick Split 50/50 with Jess</label></div>
   <div class="ck" id="rl-settled-wrap" style="display:none;padding-left:22px">
-    <input type="checkbox" id="rl-settled"><label for="rl-settled">Also auto-tick Already settled (Jess pays her half directly)</label>
+    <input type="checkbox" id="rl-settled"><label for="rl-settled" id="lbl-rl-settled">Also auto-tick Already settled (Jess pays her half directly)</label>
   </div>
   <div class="dvd"></div>
   <div class="ck"><input type="checkbox" id="rl-recurring" onchange="document.getElementById('rl-amount-wrap').style.display=this.checked?'block':'none'"><label for="rl-recurring">This is a recurring expense (e.g. a subscription or regular bill)</label></div>
@@ -1123,6 +1151,14 @@ tbody tr:hover td{background:var(--bg3);}
   </div>
 
   <div style="border-top:1px solid var(--line);margin-bottom:16px"></div>
+
+  <!-- SHARED EXPENSES PARTY -->
+  <div style="font-size:10px;color:var(--tx2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Shared expenses</div>
+  <div style="font-size:11px;color:var(--tx3);margin-bottom:12px;line-height:1.6">The name of the person you share expenses with — used throughout the Shared Expenses page and related labels.</div>
+  <div class="fg" style="margin-bottom:10px"><label>Their name</label><input type="text" id="party-name-input" placeholder="e.g. Jess"></div>
+  <button class="btn pr sm" onclick="savePartyNameSetting()">Save name</button>
+
+  <div style="border-top:1px solid var(--line);margin:16px 0"></div>
 
   <!-- FX RATES -->
   <div style="font-size:10px;color:var(--tx2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Exchange rates (units per £1 GBP)</div>
@@ -1194,6 +1230,7 @@ let salary = JSON.parse(localStorage.getItem('pf_salary')||JSON.stringify({gross
 let budgetFilterCats = new Set(JSON.parse(localStorage.getItem('pf_budget_excl')||'[]'));
 let budgetFilterMode = localStorage.getItem('pf_budget_mode') || 'exclude';
 let tvKey = localStorage.getItem('pf_tv_key') || '';
+let partyName = localStorage.getItem('pf_party_name') || 'Jess';
 let undoStack = JSON.parse(localStorage.getItem('pf_undo')||'[]');
 let lastSnapshot = null;
 
@@ -1394,19 +1431,9 @@ function toggleAssetSelection(id,event){
 function renderAssetSectionSummary(type,label,valueFn,chartId,color,stack){
   const root=document.getElementById(`${type}-summary`);
   if(!root)return;
-  const items={cash:cashItems,shares:shareItems,crypto:cryptoItems,pension:pensionItems}[type]||[];
-  const latest=items[items.length-1];
-  const latestTitle=latest?esc(latest.name||latest.account||latest.currency||'Latest entry'):'No entries yet';
-  const latestValue=latest?fk(valueFn(latest)):'—';
   const history=snaps.slice().sort((a,b)=>a.date.localeCompare(b.date));
-  root.innerHTML=`<div class="g2">
-      <div class="card"><div class="ch"><h3>${label} — latest entry</h3>
-        <span style="font-family:var(--serif);font-size:16px;color:var(--ac)">${latestValue}</span></div>
-        <div class="cb">${latest?`${latestTitle}`:'Add an asset to see the latest update here.'}</div>
-      </div>
-      <div class="card"><div class="ch"><h3>${label} snapshot trend</h3></div>
-        <div class="cb">${history.length?`<div class="cw" style="height:200px"><canvas id="${chartId}"></canvas></div>${stack?`<div class="leg" id="${chartId}-leg"></div>`:''}`:'No monthly snapshot data yet. Use Update values & lock month.'}</div>
-      </div>
+  root.innerHTML=`<div class="card"><div class="ch"><h3>${label} snapshot trend</h3></div>
+      <div class="cb">${history.length?`<div class="cw" style="height:220px"><canvas id="${chartId}"></canvas></div>${stack?`<div class="leg" id="${chartId}-leg"></div>`:''}`:'No monthly snapshot data yet. Use Update values & lock month.'}</div>
     </div>`;
   if(history.length){
     if(assetCharts[type]){assetCharts[type].destroy();assetCharts[type]=null;}
@@ -1471,7 +1498,13 @@ function go(id,btn){
   if(id==='triage')renderTri();
   if(id==='cats')renderCats();
   if(id==='rules')renderRules();
-  if(id==='split'){setTimeout(()=>{renderSplit();},30);}
+  if(id==='split'){
+    setTimeout(()=>{renderSplit();},30);
+    if(!localStorage.getItem('pf_party_name')){
+      document.getElementById('party-name-first-input').value='';
+      om('mo-party-name-first');
+    }
+  }
   if(id==='a-overview')renderAOverview();
   if(id==='a-cash')renderCashSection();
   if(id==='a-shares')renderSharesSection();
@@ -1733,7 +1766,9 @@ function renderExp(){
       <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
       <td style="font-weight:500;white-space:nowrap">${f(e.amount)}</td>
       <td style="white-space:nowrap;color:${e.split?'var(--ac2)':'var(--tx)'};font-weight:500">${f(sh)}</td>
-      <td>${e.split&&e.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)" title="Jess already paid her half — not tracked in Shared Expenses">✓ Settled</span>`:`<span class="bge ${e.split?'sy':'sn'}">${e.split?'÷2 Jess':'Just me'}</span>`}</td>
+      <td>${e.split&&e.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)" title="Already settled directly — not tracked in Shared Expenses">✓ Settled</span>`
+        :e.split&&e.paidBy==='jess'?`<span class="bge" style="background:rgba(240,96,96,.14);color:var(--red)" title="${esc(partyName)} paid — you owe them half">÷2 ${esc(partyName)} paid</span>`
+        :`<span class="bge ${e.split?'sy':'sn'}">${e.split?`÷2 ${esc(partyName)}`:'Just me'}</span>`}</td>
       <td style="white-space:nowrap">
         <button class="btn sm gh" onclick="editExp('${e.id}')">Edit</button>
         <button class="btn sm gh dr" onclick="delExp('${e.id}')">✕</button>
@@ -1825,6 +1860,8 @@ function openAddExp(){
   document.getElementById('e-d').value=td();
   ['e-a','e-de','e-n'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('e-sp').checked=false;
+  document.getElementById('e-paidby').value='me';
+  document.getElementById('e-paidby-wrap').style.display='none';
   document.getElementById('e-settled').checked=false;
   document.getElementById('e-settled-wrap').style.display='none';
   document.getElementById('e-cur').value='GBP';
@@ -1850,6 +1887,8 @@ function editExp(id){
   document.getElementById('e-de').value=e.desc;
   document.getElementById('e-n').value=e.notes||'';
   document.getElementById('e-sp').checked=!!e.split;
+  document.getElementById('e-paidby').value=e.paidBy||'me';
+  document.getElementById('e-paidby-wrap').style.display=e.split?'flex':'none';
   document.getElementById('e-settled').checked=!!e.settled;
   document.getElementById('e-settled-wrap').style.display=e.split?'flex':'none';
   pcd();document.getElementById('e-c').value=e.cat;om('mo-exp');
@@ -1864,11 +1903,12 @@ function saveExp(){
   const desc=document.getElementById('e-de').value.trim();
   const cat=document.getElementById('e-c').value;
   const split=document.getElementById('e-sp').checked;
+  const paidBy=split?document.getElementById('e-paidby').value:'me';
   const settled=split&&document.getElementById('e-settled').checked;
   const notes=document.getElementById('e-n').value.trim();
   if(!date||!enteredAmt||!desc){alert('Fill in date, amount and description.');return;}
-  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,currency,fx,origAmt,desc,cat,split,settled,notes};}
-  else expenses.push({id:uid(),date,amount,currency,fx,origAmt,desc,cat,split,settled,notes});
+  if(editEid){const i=expenses.findIndex(x=>x.id===editEid);expenses[i]={...expenses[i],date,amount,currency,fx,origAmt,desc,cat,split,paidBy,settled,notes};}
+  else expenses.push({id:uid(),date,amount,currency,fx,origAmt,desc,cat,split,paidBy,settled,notes});
   sv();renderExp();renderEM();cm('mo-exp');
   if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
 }
@@ -1961,7 +2001,7 @@ function renderDupes(){
             <div class="pr-row" style="justify-content:space-between">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">
                 <input type="checkbox" data-dupe-id="${e.id}" style="accent-color:var(--red);width:14px;height:14px;cursor:pointer">
-                <span>${gc(e.cat).name} · ${e.split?'÷2 Jess':'Just me'}${e.notes?' · '+esc(e.notes):''}</span>
+                <span>${gc(e.cat).name} · ${e.split?`÷2 ${esc(partyName)}`:'Just me'}${e.notes?' · '+esc(e.notes):''}</span>
               </label>
               <button class="btn sm gh" onclick="cm('mo-dupes');editExp('${e.id}')">Edit</button>
             </div>`).join('')}
@@ -2653,7 +2693,8 @@ function renderEoPie(items){
 // ═══════════════════════════════════════════
 let selectedSplitMonth=null;
 function computeJessBalance(){
-  const splitOwed=expenses.filter(e=>e.split&&!e.settled).reduce((s,e)=>s+e.amount/2,0);
+  // paidBy 'jess' means she fronted the cash — that flips the direction: it's money I owe her, not money she owes me
+  const splitOwed=expenses.filter(e=>e.split&&!e.settled).reduce((s,e)=>s+(e.paidBy==='jess'?-e.amount/2:e.amount/2),0);
   const iPaidJess=settlements.filter(s=>s.direction==='i_paid_jess').reduce((s,x)=>s+x.amount,0);
   const jessPaidMe=settlements.filter(s=>s.direction==='jess_paid_me').reduce((s,x)=>s+x.amount,0);
   const balance=splitOwed+iPaidJess-jessPaidMe;
@@ -2667,7 +2708,7 @@ function renderSplit(){
   document.getElementById('split-metrics').innerHTML=`
     <div class="m g"><div class="ml">Total split spend</div><div class="mv">${fk(totalSplitAmount)}</div><div class="ms">${splitItems.length} transactions</div></div>
     <div class="m b"><div class="ml">Your share</div><div class="mv">${fk(totalSplitAmount/2)}</div><div class="ms">of split spend</div></div>
-    <div class="m p"><div class="ml">Jess's share</div><div class="mv">${fk(totalSplitAmount/2)}</div><div class="ms">of split spend</div></div>
+    <div class="m p"><div class="ml">${esc(partyName)}'s share</div><div class="mv">${fk(totalSplitAmount/2)}</div><div class="ms">of split spend</div></div>
     <div class="m a"><div class="ml">This month</div><div class="mv">${fk(thisMonthSplit)}</div><div class="ms">split spend</div></div>`;
   renderSplitBalance();
   renderSplitChart();
@@ -2680,14 +2721,17 @@ function renderSplitBalance(){
   const el=document.getElementById('split-balance');
   let headline,color;
   if(Math.abs(balance)<0.005){headline='All settled up 🎉';color='var(--tx)';}
-  else if(balance>0){headline=`Jess owes you ${f(balance)}`;color='var(--ac2)';}
-  else{headline=`You owe Jess ${f(Math.abs(balance))}`;color='var(--red)';}
+  else if(balance>0){headline=`${esc(partyName)} owes you ${f(balance)}`;color='var(--ac2)';}
+  else{headline=`You owe ${esc(partyName)} ${f(Math.abs(balance))}`;color='var(--red)';}
+  const splitLine=splitOwed>=0
+    ?`${esc(partyName)} owes you ${f(splitOwed)} from split expenses`
+    :`You owe ${esc(partyName)} ${f(Math.abs(splitOwed))} from split expenses`;
   el.innerHTML=`
     <div style="font-family:var(--serif);font-size:28px;color:${color};margin-bottom:10px">${headline}</div>
     <div style="font-size:11px;color:var(--tx3);line-height:1.9">
-      Owed from split expenses: ${f(splitOwed)}<br>
-      Jess has paid you: ${f(jessPaidMe)}<br>
-      You've paid Jess: ${f(iPaidJess)}
+      ${splitLine}<br>
+      ${esc(partyName)} has paid you: ${f(jessPaidMe)}<br>
+      You've paid ${esc(partyName)}: ${f(iPaidJess)}
     </div>`;
 }
 function renderSplitChart(){
@@ -2769,7 +2813,7 @@ function renderSplitMonthDetail(){
           style="accent-color:var(--ac);width:13px;height:13px;cursor:pointer">
       </td>
       <td style="color:var(--tx2);font-size:11px;white-space:nowrap">${e.date}</td>
-      <td><div style="font-weight:500">${esc(e.desc)}</div>${e.notes?`<div style="font-size:10px;color:var(--tx3)">${esc(e.notes)}</div>`:''}</td>
+      <td><div style="font-weight:500">${esc(e.desc)}${e.paidBy==='jess'?` <span class="bge" style="background:rgba(240,96,96,.14);color:var(--red)">${esc(partyName)} paid</span>`:''}</div>${e.notes?`<div style="font-size:10px;color:var(--tx3)">${esc(e.notes)}</div>`:''}</td>
       <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
       <td style="font-weight:500;white-space:nowrap">${f(e.amount)}</td>
       <td style="white-space:nowrap;color:var(--ac2);font-weight:500">${f(e.amount/2)}</td>
@@ -2857,7 +2901,7 @@ function renderSettleTable(){
   const sorted=[...settlements].sort((a,b)=>b.date.localeCompare(a.date));
   tb.innerHTML=sorted.map(s=>`<tr>
     <td style="color:var(--tx2);font-size:11px;white-space:nowrap">${s.date}</td>
-    <td><span class="bge" style="background:${s.direction==='jess_paid_me'?'rgba(96,216,192,.14)':'rgba(240,96,96,.14)'};color:${s.direction==='jess_paid_me'?'var(--tel)':'var(--red)'}">${s.direction==='jess_paid_me'?'Jess → You':'You → Jess'}</span></td>
+    <td><span class="bge" style="background:${s.direction==='jess_paid_me'?'rgba(96,216,192,.14)':'rgba(240,96,96,.14)'};color:${s.direction==='jess_paid_me'?'var(--tel)':'var(--red)'}">${s.direction==='jess_paid_me'?`${esc(partyName)} → You`:`You → ${esc(partyName)}`}</span></td>
     <td style="font-weight:500">${f(s.amount)}</td>
     <td style="color:var(--tx3);font-size:11px">${esc(s.note||'—')}</td>
     <td style="white-space:nowrap">
@@ -2949,6 +2993,7 @@ function parseCsvLine(line){
   out.push(cur);
   return out.map(s=>s.trim());
 }
+let pendingJessImport=null;
 function doJessImport(){
   const raw=document.getElementById('jess-import-txt').value.trim();
   if(!raw){alert('Paste CSV text or choose a file first.');return;}
@@ -2964,13 +3009,25 @@ function doJessImport(){
     if(!date||!desc||!amount){fail.push(line);return;}
     let cat=cats.find(c=>c.name.toLowerCase()===(catName||'').trim().toLowerCase())?.id;
     if(!cat)cat=acat(desc);
-    ok.push({date,desc:desc.trim(),amount,cat,split:true,notes:(notes||'').trim()});
+    ok.push({date,desc:desc.trim(),amount,cat,split:true,paidBy:'jess',notes:(notes||'').trim()});
   });
   if(!ok.length){alert(`Could not parse any rows. Check the CSV format — expected: Date,Description,Category,Amount,MyShare,Notes`);return;}
+  pendingJessImport={ok,fail};
+  const total=ok.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('jess-confirm-body').innerHTML=`
+    <p style="margin-bottom:10px"><strong style="color:var(--tx)">${ok.length}</strong> item${ok.length!==1?'s':''} parsed, totalling <strong style="color:var(--tx)">${f(total)}</strong>${fail.length?` (${fail.length} row${fail.length!==1?'s':''} skipped)`:''}.</p>
+    <p>Since ${esc(partyName)} paid for these, once confirmed in Triage this will add <strong style="color:var(--red)">${f(total/2)}</strong> to what you owe them (until settled or you record a payment).</p>`;
+  cm('mo-jess-import');
+  om('mo-jess-confirm');
+}
+function confirmJessImport(){
+  if(!pendingJessImport)return;
+  const{ok,fail}=pendingJessImport;
   ok.forEach(r=>triage.push({id:uid(),...r}));
   sv();badge();
-  showToast(`✓ ${ok.length} item${ok.length!==1?'s':''} from Jess sent to Triage${fail.length?`, ${fail.length} row${fail.length!==1?'s':''} skipped`:''}`);
-  cm('mo-jess-import');
+  showToast(`✓ ${ok.length} item${ok.length!==1?'s':''} from ${partyName} sent to Triage${fail.length?`, ${fail.length} row${fail.length!==1?'s':''} skipped`:''}`);
+  cm('mo-jess-confirm');
+  pendingJessImport=null;
   go('triage',Array.from(document.querySelectorAll('.sb-btn')).find(b=>b.textContent.trim().startsWith('Triage')));
 }
 
@@ -3827,11 +3884,12 @@ function renderBudget(){
   const thisMonth=now.toISOString().slice(0,7);
   const thisMonthExpenses=budgetItems.filter(e=>e.date.startsWith(thisMonth)).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0);
   const leftThisMonth=salary.net-thisMonthExpenses;
+  const leftPctThisMonth=salary.net>0?(leftThisMonth/salary.net*100):0;
   document.getElementById('budget-metrics').innerHTML=`
     <div class="m b"><div class="ml">Monthly take-home</div><div class="mv">${fk(salary.net)}</div><div class="ms">post-tax</div></div>
     <div class="m"><div class="ml">Monthly salary (pre-tax)</div><div class="mv">${fk(salary.gross)}</div><div class="ms">gross</div></div>
     <div class="m a"><div class="ml">Spent this month</div><div class="mv">${fk(thisMonthExpenses)}</div><div class="ms">my share${budgetFilterCats.size?', filtered':''}</div></div>
-    <div class="m ${leftThisMonth>=0?'g':'r'}"><div class="ml">Left this month</div><div class="mv" style="${leftThisMonth<0?'color:var(--red)':''}">${fks(leftThisMonth)}</div><div class="ms">take-home − expenses</div></div>`;
+    <div class="m ${leftThisMonth>=0?'g':'r'}"><div class="ml">Left this month</div><div class="mv" style="${leftThisMonth<0?'color:var(--red)':''}">${fks(leftThisMonth)}</div><div class="ms">${leftPctThisMonth>=0?'+':''}${leftPctThisMonth.toFixed(1)}% of take-home</div></div>`;
 
   const months=[...new Set(expenses.map(e=>e.date.slice(0,7)))].sort();
   const canvas=document.getElementById('budget-chart');
@@ -3842,12 +3900,13 @@ function renderBudget(){
     ctx.fillStyle='rgba(138,135,148,.35)';ctx.font='12px sans-serif';ctx.textAlign='center';
     ctx.fillText('No expenses yet.',canvas.offsetWidth/2||300,80);
     leg.innerHTML='';
-    document.getElementById('budget-tb').innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--tx2);padding:16px">No expenses yet.</td></tr>`;
+    document.getElementById('budget-tb').innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:16px">No expenses yet.</td></tr>`;
     return;
   }
   const expenseTotals=months.map(m=>budgetItems.filter(e=>e.date.startsWith(m)).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0));
   const takeHomeTotals=months.map(()=>salary.net);
   const leftovers=months.map((_,i)=>salary.net-expenseTotals[i]);
+  const leftPcts=leftovers.map(l=>salary.net>0?(l/salary.net*100):0);
   const maxVal=Math.max(0,...expenseTotals,...takeHomeTotals);
   cBudget=new Chart(canvas,{
     data:{labels:months,datasets:[
@@ -3856,12 +3915,28 @@ function renderBudget(){
       {type:'line',label:'Left over',data:leftovers,borderColor:'#c8f060',backgroundColor:'transparent',borderWidth:2,tension:.4,pointBackgroundColor:'#c8f060',pointRadius:3,pointHoverRadius:5,order:1}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${c.dataset.label}: ${fks(c.raw)}`}}},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.datasetIndex===2?`${c.dataset.label}: ${fks(c.raw)} (${leftPcts[c.dataIndex]>=0?'+':''}${leftPcts[c.dataIndex].toFixed(1)}%)`:`${c.dataset.label}: ${fks(c.raw)}`}}},
       interaction:{mode:'index',intersect:false},
       scales:{
         y:{suggestedMax:maxVal>0?maxVal*1.18:undefined,ticks:{callback:v=>fk(v),color:'#8a8794'},grid:{color:'rgba(255,255,255,.05)'}},
         x:{grid:{display:false},ticks:{color:'#8a8794'}}
-      }}
+      }},
+    plugins:[{
+      id:'budget-left-pct-label',
+      afterDatasetsDraw(chart){
+        const{ctx}=chart;
+        const lineMeta=chart.getDatasetMeta(2);
+        ctx.save();
+        ctx.font='600 10px DM Sans,sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='bottom';
+        ctx.fillStyle='#c8f060';
+        lineMeta.data.forEach((point,i)=>{
+          const pct=leftPcts[i];
+          ctx.fillText(`${pct>=0?'+':''}${pct.toFixed(0)}%`,point.x,point.y-8);
+        });
+        ctx.restore();
+      }
+    }]
   });
   leg.innerHTML=`<div class="li"><div class="ld" style="background:#60a8f0"></div>Take-home salary</div>
     <div class="li"><div class="ld" style="background:#f06060"></div>Expenses</div>
@@ -3871,11 +3946,13 @@ function renderBudget(){
   tb.innerHTML=[...months].reverse().map(m=>{
     const i=months.indexOf(m);
     const left=leftovers[i];
+    const pct=salary.net>0?(left/salary.net*100):0;
     return`<tr>
       <td style="font-weight:500">${m}</td>
       <td>${f(salary.net)}</td>
       <td>${f(expenseTotals[i])}</td>
       <td style="font-weight:500;color:${left<0?'var(--red)':'var(--ac2)'}">${fks(left)}</td>
+      <td style="font-weight:500;color:${left<0?'var(--red)':'var(--ac2)'}">${pct>=0?'+':''}${pct.toFixed(1)}%</td>
     </tr>`;
   }).join('');
 }
@@ -3895,14 +3972,14 @@ function renderRules(){
   const sorted=[...rules].sort((a,b)=>a.keyword.localeCompare(b.keyword));
   el.innerHTML=`<div class="tw"><table>
     <thead><tr>
-      <th>Keyword (contains)</th><th>Assign to category</th><th>Auto-split with Jess</th><th>Recurring</th><th>Auto-add</th><th style="width:80px"></th>
+      <th>Keyword (contains)</th><th>Assign to category</th><th>Auto-split with ${esc(partyName)}</th><th>Recurring</th><th>Auto-add</th><th style="width:80px"></th>
     </tr></thead>
     <tbody>${sorted.map(r=>{
       const c=gc(r.cat);
       return `<tr>
         <td style="font-weight:500;font-family:monospace;font-size:12px">${esc(r.keyword)}</td>
         <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
-        <td>${r.split&&r.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)">✓ Settled</span>`:r.split?`<span class="bge sy">÷2 Jess</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
+        <td>${r.split&&r.settled?`<span class="bge" style="background:rgba(160,128,240,.14);color:var(--pur)">✓ Settled</span>`:r.split?`<span class="bge sy">÷2 ${esc(partyName)}</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
         <td>${r.recurring?`<span class="bge" style="background:rgba(200,240,96,.14);color:var(--ac)">🔁 ${f(r.amount||0)}</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
         <td>${r.autoAdd?`<span class="bge" style="background:rgba(96,168,240,.14);color:#60a8f0" title="Next due: ${nextAutoDate(r)}">${FREQ_LABELS[r.frequency]||'Fortnightly'} from ${r.startDate}</span>`:`<span style="color:var(--tx3)">—</span>`}</td>
         <td style="white-space:nowrap">
@@ -4073,7 +4150,7 @@ function renderAutoAddedList(){
       return`<tr>
         <td style="text-align:center"><input type="checkbox" data-auto-id="${e.id}" style="accent-color:var(--red);width:14px;height:14px;cursor:pointer"></td>
         <td style="color:var(--tx2);font-size:11px;white-space:nowrap">${e.date}</td>
-        <td>${esc(e.desc)}${e.split?` <span class="bge sy" style="margin-left:4px">÷2 Jess</span>`:''}</td>
+        <td>${esc(e.desc)}${e.split?` <span class="bge sy" style="margin-left:4px">÷2 ${esc(partyName)}</span>`:''}</td>
         <td><span class="bge" style="background:${c.color}22;color:${c.color}">${c.name}</span></td>
         <td style="font-weight:500;white-space:nowrap">${f(e.amount)}</td>
       </tr>`;}).join('')}</tbody></table></div>`;
@@ -4184,6 +4261,65 @@ function toggleTheme(){
 }
 
 // ═══════════════════════════════════════════
+// SHARED EXPENSES PARTY NAME
+// ═══════════════════════════════════════════
+function applyPartyName(){
+  const p=partyName;
+  const setText=(id,text)=>{const el=document.getElementById(id);if(el)el.textContent=text;};
+  const setTitle=(id,text)=>{const el=document.getElementById(id);if(el)el.title=text;};
+  setText('triage-info-text',`Review pasted transactions. Tick which to split 50/50 with ${p}, adjust categories, then confirm.`);
+  setTitle('th-triage-settled',`Already settled — ${p} paid their half directly, won't be added to Shared Expenses`);
+  setText('split-exchange-label',`Exchange line items with ${p}:`);
+  setText('btn-import-jess',`📥 Import from ${p}`);
+  setText('h3-balance-jess',`Balance with ${p}`);
+  setTitle('btn-mark-settled-detail',`${p} already settled their half directly — removes from shared tracking`);
+  setText('th-jess-share',`${p}'s share`);
+  setText('lbl-e-sp',`Split 50/50 with ${p}`);
+  setText('opt-paidby-me',`Me (${p} owes me half)`);
+  setText('opt-paidby-jess',`${p} (I owe them half)`);
+  setText('lbl-rc-sp',`Split 50/50 with ${p}`);
+  setText('lbl-rc-settled',`Already settled — ${p} paid their half directly (won't count toward the Shared Expenses balance)`);
+  setText('opt-settle-jess-paid-me',`${p} paid me`);
+  setText('opt-settle-i-paid-jess',`I paid ${p}`);
+  setText('h3-jess-import',`Import line items from ${p}`);
+  const importInfo=document.getElementById('jess-import-info');
+  if(importInfo)importInfo.innerHTML=`Paste CSV lines ${esc(p)} sent you, or use the file picker below. Expected columns:
+    <code>Date,Description,Category,Amount,MyShare,Notes</code>
+    The Category and Notes columns are optional — we'll auto-categorise if Category is left blank. These are things <strong>${esc(p)} paid for</strong>, so they're marked "paid by ${esc(p)}" and shared 50/50 — meaning your half will count toward what you owe them. Items are sent to Triage so you can review, adjust, and confirm before they're added to your expenses.`;
+  setText('h3-jess-confirm',`Confirm import from ${p}`);
+  setText('lbl-rl-split',`Also auto-tick Split 50/50 with ${p}`);
+  setText('lbl-rl-settled',`Also auto-tick Already settled (${p} pays their half directly)`);
+}
+function refreshPartyDependentViews(){
+  if(document.getElementById('sec-split').classList.contains('on'))renderSplit();
+  if(document.getElementById('sec-rules').classList.contains('on'))renderRules();
+  if(document.getElementById('sec-expenses').classList.contains('on'))renderExp();
+  if(document.getElementById('sec-triage').classList.contains('on'))renderTri();
+}
+function savePartyNameSetting(){
+  const v=document.getElementById('party-name-input').value.trim();
+  if(!v){alert('Enter a name.');return;}
+  partyName=v;
+  localStorage.setItem('pf_party_name',partyName);
+  applyPartyName();
+  refreshPartyDependentViews();
+  showToast(`✓ Saved — now showing "${partyName}" throughout Shared Expenses`);
+}
+function savePartyNameFirst(){
+  const v=document.getElementById('party-name-first-input').value.trim();
+  if(!v){alert('Enter a name, or click Skip for now.');return;}
+  partyName=v;
+  localStorage.setItem('pf_party_name',partyName);
+  applyPartyName();
+  refreshPartyDependentViews();
+  cm('mo-party-name-first');
+}
+function skipPartyNamePrompt(){
+  localStorage.setItem('pf_party_name',partyName);
+  cm('mo-party-name-first');
+}
+
+// ═══════════════════════════════════════════
 // FX RATES — MANUAL
 // ═══════════════════════════════════════════
 // Rates = how many units of foreign currency per £1 GBP
@@ -4225,6 +4361,7 @@ function fillFxOnOpen(curSelectId, fxInputId){
 // SETTINGS MODAL
 // ═══════════════════════════════════════════
 function openSettings(){
+  document.getElementById('party-name-input').value=partyName;
   // Build FX fields
   const currencies = [
     {code:'HKD', label:'HKD — Hong Kong Dollar'},
@@ -4405,7 +4542,7 @@ function exportJSON(){
 
 function exportCSV(){
   const rows=[
-    ['Date','Description','Category','Amount (£)','My Share (£)','Split with Jess','Notes'],
+    ['Date','Description','Category','Amount (£)','My Share (£)',`Split with ${partyName}`,'Notes'],
     ...[...expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>[
       e.date,
       `"${(e.desc||'').replace(/"/g,'""')}"`,
@@ -4472,7 +4609,7 @@ function importJSON(input){
   reader.readAsText(file);
 }
 
-seed();processAutoRecurring();lastSnapshot=captureState();pcd();renderEM();renderExp();badge();initTheme();
+seed();processAutoRecurring();lastSnapshot=captureState();pcd();renderEM();renderExp();badge();initTheme();applyPartyName();
 </script>
 </body>
 </html>
