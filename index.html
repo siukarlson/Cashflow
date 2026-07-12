@@ -322,6 +322,13 @@ tbody tr:hover td{background:var(--bg3);}
     </button>
   </div>
 
+  <div class="sb-section">
+    <div class="sb-label">Budgeting</div>
+    <button class="sb-btn" id="nav-budget" onclick="go('budget',this)">
+      <span class="icon">💰</span>Budget
+    </button>
+  </div>
+
   <div class="sb-footer">
     <button class="btn sm gh" style="width:100%;justify-content:flex-start;gap:8px;margin-bottom:6px" onclick="openUndo()">
       ↩️ Undo
@@ -559,6 +566,43 @@ tbody tr:hover td{background:var(--bg3);}
           <th>Cost (GBP)</th><th>Current (GBP)</th><th>Gain £</th><th>Gain %</th>
         </tr></thead><tbody id="gtb"></tbody>
       </table></div>
+    </div>
+
+    <!-- BUDGET -->
+    <div id="sec-budget" class="sec">
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><h3>Salary</h3></div>
+        <div class="cb">
+          <div class="fr">
+            <div class="fg"><label>Monthly salary (pre-tax)</label><input type="number" id="bg-gross" step="0.01" placeholder="0.00"></div>
+            <div class="fg"><label>Monthly take-home (post-tax)</label><input type="number" id="bg-net" step="0.01" placeholder="0.00"></div>
+          </div>
+          <button class="btn pr sm" onclick="saveSalary()">Save salary</button>
+        </div>
+      </div>
+      <div id="budget-cat-filter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center;">
+        <span style="font-size:11px;color:var(--tx3);flex-shrink:0" id="budget-mode-label">Categories to exclude from budget (click = only this one, ctrl+click = add/remove):</span>
+        <div class="tbl" style="gap:5px">
+          <button class="btn sm gh" id="budget-mode-include-btn" onclick="setBudgetFilterMode('include')">Include only selected</button>
+          <button class="btn sm pr" id="budget-mode-exclude-btn" onclick="setBudgetFilterMode('exclude')">Exclude selected</button>
+        </div>
+        <div id="budget-cat-pill-list" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+        <button class="btn sm gh" onclick="selectAllBudgetCatFilter()" style="margin-left:4px">Select all</button>
+        <button class="btn sm gh" id="budget-cat-clear-btn" onclick="clearBudgetCatFilter()" style="display:none">Deselect all</button>
+      </div>
+      <div class="metrics" id="budget-metrics"></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>Take-home vs expenses, by month</h3></div>
+        <div class="cb"><div class="cw" style="height:280px"><canvas id="budget-chart"></canvas></div>
+        <div class="leg" id="budget-leg"></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>Monthly breakdown</h3></div>
+        <div class="tw" style="border:none;border-radius:0"><table>
+          <thead><tr><th>Month</th><th>Take-home salary</th><th>Expenses (my share)</th><th>Left over</th></tr></thead>
+          <tbody id="budget-tb"></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- CATEGORIES -->
@@ -1146,6 +1190,9 @@ let cryptoItems = JSON.parse(localStorage.getItem('pf_crypto')||'[]');
 let pensionItems= JSON.parse(localStorage.getItem('pf_pension')||'[]');
 let snaps       = JSON.parse(localStorage.getItem('pf_s')||'[]');
 let settlements = JSON.parse(localStorage.getItem('pf_settlements')||'[]');
+let salary = JSON.parse(localStorage.getItem('pf_salary')||JSON.stringify({gross:0,net:0}));
+let budgetFilterCats = new Set(JSON.parse(localStorage.getItem('pf_budget_excl')||'[]'));
+let budgetFilterMode = localStorage.getItem('pf_budget_mode') || 'exclude';
 let tvKey = localStorage.getItem('pf_tv_key') || '';
 let undoStack = JSON.parse(localStorage.getItem('pf_undo')||'[]');
 let lastSnapshot = null;
@@ -1192,6 +1239,9 @@ function sv(){
   localStorage.setItem('pf_pension',JSON.stringify(pensionItems));
   localStorage.setItem('pf_s',JSON.stringify(snaps));
   localStorage.setItem('pf_settlements',JSON.stringify(settlements));
+  localStorage.setItem('pf_salary',JSON.stringify(salary));
+  localStorage.setItem('pf_budget_excl',JSON.stringify([...budgetFilterCats]));
+  localStorage.setItem('pf_budget_mode',budgetFilterMode);
 }
 function captureState(){
   return{
@@ -1204,7 +1254,10 @@ function captureState(){
     cryptoItems:JSON.parse(JSON.stringify(cryptoItems)),
     pensionItems:JSON.parse(JSON.stringify(pensionItems)),
     snaps:JSON.parse(JSON.stringify(snaps)),
-    settlements:JSON.parse(JSON.stringify(settlements))
+    settlements:JSON.parse(JSON.stringify(settlements)),
+    salary:JSON.parse(JSON.stringify(salary)),
+    budgetExcludedCats:[...budgetFilterCats],
+    budgetFilterMode
   };
 }
 function applyState(state){
@@ -1218,12 +1271,16 @@ function applyState(state){
   pensionItems=JSON.parse(JSON.stringify(state.pensionItems));
   snaps=JSON.parse(JSON.stringify(state.snaps));
   settlements=JSON.parse(JSON.stringify(state.settlements));
+  salary=JSON.parse(JSON.stringify(state.salary||{gross:0,net:0}));
+  budgetFilterCats=new Set(state.budgetExcludedCats||[]);
+  budgetFilterMode=state.budgetFilterMode||'exclude';
 }
 function diffLabel(oldS,newS){
   const checks=[
     ['expenses','Expenses'],['triage','Triage'],['rules','Rules'],['cats','Categories'],
     ['cashItems','Cash accounts'],['shareItems','Share positions'],['cryptoItems','Crypto positions'],
-    ['pensionItems','Pension funds'],['snaps','Snapshots'],['settlements','Payments']
+    ['pensionItems','Pension funds'],['snaps','Snapshots'],['settlements','Payments'],['salary','Salary'],
+    ['budgetExcludedCats','Budget filter']
   ];
   const parts=[];
   checks.forEach(([key,label])=>{
@@ -1399,7 +1456,8 @@ function renderAssetSectionSummary(type,label,valueFn,chartId,color,stack){
 const PAGE_TITLES={
   'exp-overview':'Expense Overview',expenses:'Expense Line Item',triage:'Triage',cats:'Categories',rules:'Auto-rules',split:'Shared Expenses',
   'a-overview':'Assets — Overview','a-cash':'Cash & Savings','a-shares':'Shares',
-  'a-crypto':'Crypto','a-pension':'Pension','a-gains':'Gains & P&L'
+  'a-crypto':'Crypto','a-pension':'Pension','a-gains':'Gains & P&L',
+  budget:'Budgeting'
 };
 
 function go(id,btn){
@@ -1420,6 +1478,7 @@ function go(id,btn){
   if(id==='a-crypto')renderCryptoSection();
   if(id==='a-pension')renderPensionSection();
   if(id==='a-gains')renderGains();
+  if(id==='budget')renderBudget();
 }
 
 // ═══════════════════════════════════════════
@@ -3680,6 +3739,148 @@ function renderGains(){
 }
 
 // ═══════════════════════════════════════════
+// BUDGET
+// ═══════════════════════════════════════════
+let cBudget=null;
+function saveSalary(){
+  const gross=parseFloat(document.getElementById('bg-gross').value)||0;
+  const net=parseFloat(document.getElementById('bg-net').value)||0;
+  salary={gross,net};
+  sv();
+  showToast('✓ Salary saved');
+  renderBudget();
+}
+function isBudgetFilteredOut(e){
+  if(!budgetFilterCats.size)return false;
+  const cat=gc(e.cat);
+  const inSet=budgetFilterCats.has(e.cat)||!!(cat.parentId&&budgetFilterCats.has(cat.parentId));
+  return budgetFilterMode==='exclude'?inSet:!inSet;
+}
+function budgetExpenses(){
+  return expenses.filter(e=>!isBudgetFilteredOut(e));
+}
+function setBudgetFilterMode(mode){
+  if(budgetFilterMode===mode)return;
+  budgetFilterMode=mode;
+  budgetFilterCats.clear();
+  sv();
+  buildBudgetCatPills();
+  renderBudget();
+}
+function buildBudgetCatPills(){
+  const container=document.getElementById('budget-cat-pill-list');
+  if(!container)return;
+  const includeMode=budgetFilterMode==='include';
+  document.getElementById('budget-mode-include-btn').classList.toggle('pr',includeMode);
+  document.getElementById('budget-mode-include-btn').classList.toggle('gh',!includeMode);
+  document.getElementById('budget-mode-exclude-btn').classList.toggle('pr',!includeMode);
+  document.getElementById('budget-mode-exclude-btn').classList.toggle('gh',includeMode);
+  document.getElementById('budget-mode-label').textContent=includeMode
+    ?'Categories to include in budget (click = only this one, ctrl+click = add/remove):'
+    :'Categories to exclude from budget (click = only this one, ctrl+click = add/remove):';
+  container.innerHTML=cats.map(c=>{
+    const on=budgetFilterCats.has(c.id);
+    return`<span class="cat-pill${on?' on':''}"
+      style="background:${c.color}${on?'33':'18'};color:${c.color}"
+      onclick="toggleBudgetCatFilter('${c.id}',event)">
+      <span class="pill-dot" style="background:${c.color}"></span>${c.name}
+    </span>`;
+  }).join('');
+  const clearBtn=document.getElementById('budget-cat-clear-btn');
+  if(clearBtn)clearBtn.style.display=budgetFilterCats.size?'inline-flex':'none';
+}
+function toggleBudgetCatFilter(id,event){
+  const multi=event&&(event.ctrlKey||event.metaKey);
+  if(multi){
+    if(budgetFilterCats.has(id))budgetFilterCats.delete(id);else budgetFilterCats.add(id);
+  }else{
+    if(budgetFilterCats.size===1&&budgetFilterCats.has(id)){
+      budgetFilterCats.clear();
+    }else{
+      budgetFilterCats.clear();
+      budgetFilterCats.add(id);
+    }
+  }
+  sv();
+  buildBudgetCatPills();
+  renderBudget();
+}
+function selectAllBudgetCatFilter(){
+  budgetFilterCats=new Set(cats.map(c=>c.id));
+  sv();
+  buildBudgetCatPills();
+  renderBudget();
+}
+function clearBudgetCatFilter(){
+  budgetFilterCats.clear();
+  sv();
+  buildBudgetCatPills();
+  renderBudget();
+}
+function renderBudget(){
+  document.getElementById('bg-gross').value=salary.gross||'';
+  document.getElementById('bg-net').value=salary.net||'';
+  buildBudgetCatPills();
+
+  const budgetItems=budgetExpenses();
+  const now=new Date();
+  const thisMonth=now.toISOString().slice(0,7);
+  const thisMonthExpenses=budgetItems.filter(e=>e.date.startsWith(thisMonth)).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0);
+  const leftThisMonth=salary.net-thisMonthExpenses;
+  document.getElementById('budget-metrics').innerHTML=`
+    <div class="m b"><div class="ml">Monthly take-home</div><div class="mv">${fk(salary.net)}</div><div class="ms">post-tax</div></div>
+    <div class="m"><div class="ml">Monthly salary (pre-tax)</div><div class="mv">${fk(salary.gross)}</div><div class="ms">gross</div></div>
+    <div class="m a"><div class="ml">Spent this month</div><div class="mv">${fk(thisMonthExpenses)}</div><div class="ms">my share${budgetFilterCats.size?', filtered':''}</div></div>
+    <div class="m ${leftThisMonth>=0?'g':'r'}"><div class="ml">Left this month</div><div class="mv" style="${leftThisMonth<0?'color:var(--red)':''}">${fks(leftThisMonth)}</div><div class="ms">take-home − expenses</div></div>`;
+
+  const months=[...new Set(expenses.map(e=>e.date.slice(0,7)))].sort();
+  const canvas=document.getElementById('budget-chart');
+  if(cBudget){cBudget.destroy();cBudget=null;}
+  const leg=document.getElementById('budget-leg');
+  if(!months.length){
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='rgba(138,135,148,.35)';ctx.font='12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('No expenses yet.',canvas.offsetWidth/2||300,80);
+    leg.innerHTML='';
+    document.getElementById('budget-tb').innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--tx2);padding:16px">No expenses yet.</td></tr>`;
+    return;
+  }
+  const expenseTotals=months.map(m=>budgetItems.filter(e=>e.date.startsWith(m)).reduce((s,e)=>s+(e.split?e.amount/2:e.amount),0));
+  const takeHomeTotals=months.map(()=>salary.net);
+  const leftovers=months.map((_,i)=>salary.net-expenseTotals[i]);
+  const maxVal=Math.max(0,...expenseTotals,...takeHomeTotals);
+  cBudget=new Chart(canvas,{
+    data:{labels:months,datasets:[
+      {type:'bar',label:'Take-home salary',data:takeHomeTotals,backgroundColor:'rgba(96,168,240,.5)',borderColor:'#60a8f0',borderWidth:1,borderRadius:4,order:3},
+      {type:'bar',label:'Expenses',data:expenseTotals,backgroundColor:'rgba(240,96,96,.5)',borderColor:'#f06060',borderWidth:1,borderRadius:4,order:2},
+      {type:'line',label:'Left over',data:leftovers,borderColor:'#c8f060',backgroundColor:'transparent',borderWidth:2,tension:.4,pointBackgroundColor:'#c8f060',pointRadius:3,pointHoverRadius:5,order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${c.dataset.label}: ${fks(c.raw)}`}}},
+      interaction:{mode:'index',intersect:false},
+      scales:{
+        y:{suggestedMax:maxVal>0?maxVal*1.18:undefined,ticks:{callback:v=>fk(v),color:'#8a8794'},grid:{color:'rgba(255,255,255,.05)'}},
+        x:{grid:{display:false},ticks:{color:'#8a8794'}}
+      }}
+  });
+  leg.innerHTML=`<div class="li"><div class="ld" style="background:#60a8f0"></div>Take-home salary</div>
+    <div class="li"><div class="ld" style="background:#f06060"></div>Expenses</div>
+    <div class="li"><div class="ld" style="background:#c8f060"></div>Left over</div>`;
+
+  const tb=document.getElementById('budget-tb');
+  tb.innerHTML=[...months].reverse().map(m=>{
+    const i=months.indexOf(m);
+    const left=leftovers[i];
+    return`<tr>
+      <td style="font-weight:500">${m}</td>
+      <td>${f(salary.net)}</td>
+      <td>${f(expenseTotals[i])}</td>
+      <td style="font-weight:500;color:${left<0?'var(--red)':'var(--ac2)'}">${fks(left)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
 // RULES
 // ═══════════════════════════════════════════
 function renderRules(){
@@ -4190,7 +4391,9 @@ function exportJSON(){
     version:1,
     exported:new Date().toISOString(),
     expenses,triage,cats,rules,
-    cashItems,shareItems,cryptoItems,pensionItems,snaps
+    cashItems,shareItems,cryptoItems,pensionItems,snaps,salary,
+    budgetExcludedCats:[...budgetFilterCats],
+    budgetFilterMode
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -4254,6 +4457,9 @@ function importJSON(input){
       cryptoItems  = data.cryptoItems  || [];
       pensionItems = data.pensionItems || [];
       snaps        = data.snaps        || [];
+      salary       = data.salary       || {gross:0,net:0};
+      budgetFilterCats = new Set(data.budgetExcludedCats||[]);
+      budgetFilterMode = data.budgetFilterMode || 'exclude';
       sv();
       // Re-render current view
       pcd();renderEM();renderExp();badge();
